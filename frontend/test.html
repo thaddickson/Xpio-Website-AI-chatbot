@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xpio Health - Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        h1 {
+            color: #FC922B;
+        }
+        .hero {
+            background: linear-gradient(135deg, #FC922B 0%, #BF5409 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .content {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 8px;
+        }
+        .badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="hero">
+        <h1>Welcome to Xpio Health</h1>
+        <p>Transforming Behavioral Health Technology</p>
+    </div>
+
+    <div class="content">
+        <div class="badge">Test Page</div>
+        <h2>About Our Solutions</h2>
+        <p>
+            Xpio Health provides cutting-edge technology solutions for behavioral health providers,
+            including EHR systems, telehealth platforms, and patient engagement tools.
+        </p>
+
+        <h3>Our Services</h3>
+        <ul>
+            <li>Electronic Health Record (EHR) Systems</li>
+            <li>Telehealth & Virtual Care Platforms</li>
+            <li>Patient Engagement Tools</li>
+            <li>Analytics & Reporting Dashboards</li>
+            <li>Revenue Cycle Management</li>
+            <li>HIPAA-Compliant Secure Messaging</li>
+        </ul>
+
+        <h3>Why Choose Xpio Health?</h3>
+        <p>
+            We understand the unique challenges of behavioral health providers and have built
+            our solutions from the ground up to address your specific needs.
+        </p>
+
+        <h3>Get in Touch</h3>
+        <p>
+            <strong>Try our chatbot!</strong> Click the chat button in the bottom-right corner
+            to learn more about our solutions and see how we can help your organization.
+        </p>
+
+        <p>
+            Our AI assistant can answer your questions, schedule demos, and connect you with
+            our team. Give it a try!
+        </p>
+    </div>
+
+    <!-- Xpio Health Chatbot -->
+    <!-- Loading widget locally for testing -->
+    <script src="./chat-widget.js"></script>
+    <script>
+        XpioChatbot.init({
+            apiUrl: 'http://localhost:3001',  // Change this to your API URL
+            primaryColor: '#FC922B',
+            position: 'bottom-right',
+            greeting: "Hi! Welcome to Xpio Health. I'm here to learn about your behavioral health technology needs and show you how we can help. What brings you here today?",
+            placeholder: "Type your message..."
+        });
+    </script>
+</body>
+</html>
