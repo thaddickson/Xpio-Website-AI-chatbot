@@ -1,5 +1,6 @@
 import { chatWithClaude, getInitialGreeting } from '../services/claudeService.js';
 import { saveLead } from '../services/leadService.js';
+import Conversation from '../models/Conversation.js';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -35,6 +36,15 @@ setInterval(() => {
     if (now - data.lastActivity > CONVERSATION_TIMEOUT) {
       conversations.delete(id);
       console.log(`🧹 Cleaned up inactive conversation: ${id}`);
+
+      // Mark as abandoned in database (don't wait)
+      Conversation.getById(id).then(conv => {
+        if (conv && conv.status === 'active') {
+          Conversation.markEnded(id).catch(err =>
+            console.error('Failed to mark conversation as abandoned:', err)
+          );
+        }
+      }).catch(err => console.error('Error checking conversation:', err));
     }
   }
 }, 5 * 60 * 1000); // Run every 5 minutes
@@ -63,6 +73,7 @@ export async function handleChatStream(req, res) {
     // Get or create conversation
     let conversationId = clientConversationId;
     let conversationData;
+    let isNewConversation = false;
 
     if (!conversationId || !conversations.has(conversationId)) {
       conversationId = uuidv4();
@@ -74,19 +85,32 @@ export async function handleChatStream(req, res) {
         lastActivity: Date.now()
       };
       conversations.set(conversationId, conversationData);
+      isNewConversation = true;
       console.log(`📝 New conversation started: ${conversationId}`);
+
+      // Create conversation in database (don't wait)
+      Conversation.create(conversationId, {
+        user_agent: req.headers['user-agent'],
+        ip_address: req.ip,
+        referrer: req.headers['referer']
+      }).catch(err => console.error('Failed to create conversation in DB:', err));
     } else {
       conversationData = conversations.get(conversationId);
       conversationData.lastActivity = Date.now();
     }
 
     // Add user message to history
-    conversationData.messages.push({
+    const userMessage = {
       role: 'user',
       content: message
-    });
+    };
+    conversationData.messages.push(userMessage);
 
     console.log(`💬 User message in ${conversationId}: ${message.substring(0, 100)}...`);
+
+    // Log user message to database (don't wait)
+    Conversation.addMessage(conversationId, userMessage)
+      .catch(err => console.error('Failed to log user message:', err));
 
     // Set up Server-Sent Events (SSE) for streaming
     res.setHeader('Content-Type', 'text/event-stream');
@@ -132,10 +156,15 @@ export async function handleChatStream(req, res) {
           console.log(`💾 Saving lead data...`);
 
           // Add assistant's response to history
-          conversationData.messages.push({
+          const assistantMessage = {
             role: 'assistant',
             content: message.content
-          });
+          };
+          conversationData.messages.push(assistantMessage);
+
+          // Log assistant message to database (don't wait)
+          Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
+            .catch(err => console.error('Failed to log assistant message:', err));
 
           // Save the lead
           let leadResult;
@@ -146,6 +175,10 @@ export async function handleChatStream(req, res) {
               conversationData.messages
             );
             conversationData.leadCaptured = true;
+
+            // Mark lead captured in conversations table (don't wait)
+            Conversation.markLeadCaptured(conversationId, leadResult.leadId)
+              .catch(err => console.error('Failed to mark lead in conversations:', err));
 
             res.write(`data: ${JSON.stringify({ type: 'lead_captured', leadId: leadResult.leadId })}\n\n`);
           } catch (error) {
@@ -180,20 +213,30 @@ export async function handleChatStream(req, res) {
             .map(block => block.text)
             .join('');
 
-          conversationData.messages.push({
+          const followUpMessage = {
             role: 'assistant',
             content: followUpText
-          });
+          };
+          conversationData.messages.push(followUpMessage);
+
+          // Log follow-up message to database (don't wait)
+          Conversation.addMessage(conversationId, followUpMessage)
+            .catch(err => console.error('Failed to log follow-up message:', err));
 
           // Stream the follow-up message
           res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
           fullResponse += '\n\n' + followUpText;
         } else {
           // No tool use, just add to history
-          conversationData.messages.push({
+          const assistantMessage = {
             role: 'assistant',
             content: fullResponse
-          });
+          };
+          conversationData.messages.push(assistantMessage);
+
+          // Log assistant message to database (don't wait)
+          Conversation.addMessage(conversationId, assistantMessage)
+            .catch(err => console.error('Failed to log assistant message:', err));
         }
 
         // Send completion event
@@ -249,6 +292,10 @@ export function handleEndConversation(req, res) {
   if (conversationId && conversations.has(conversationId)) {
     conversations.delete(conversationId);
     console.log(`🏁 Conversation ended: ${conversationId}`);
+
+    // Mark as ended in database (don't wait)
+    Conversation.markEnded(conversationId)
+      .catch(err => console.error('Failed to mark conversation ended:', err));
   }
 
   res.json({ success: true });
@@ -258,19 +305,40 @@ export function handleEndConversation(req, res) {
  * Get conversation stats (for monitoring)
  * GET /api/stats
  */
-export function handleGetStats(req, res) {
-  const stats = {
-    activeConversations: conversations.size,
-    conversations: Array.from(conversations.values()).map(conv => ({
-      id: conv.id,
-      messageCount: conv.messages.length,
-      leadCaptured: conv.leadCaptured,
-      age: Math.floor((Date.now() - conv.createdAt) / 1000 / 60) + ' minutes',
-      lastActivity: Math.floor((Date.now() - conv.lastActivity) / 1000) + ' seconds ago'
-    }))
-  };
+export async function handleGetStats(req, res) {
+  try {
+    // Get in-memory stats
+    const memoryStats = {
+      activeConversations: conversations.size,
+      conversations: Array.from(conversations.values()).map(conv => ({
+        id: conv.id,
+        messageCount: conv.messages.length,
+        leadCaptured: conv.leadCaptured,
+        age: Math.floor((Date.now() - conv.createdAt) / 1000 / 60) + ' minutes',
+        lastActivity: Math.floor((Date.now() - conv.lastActivity) / 1000) + ' seconds ago'
+      }))
+    };
 
-  res.json(stats);
+    // Get database stats
+    const dbStats = await Conversation.getStats();
+
+    res.json({
+      memory: memoryStats,
+      database: dbStats,
+      combined: {
+        totalConversations: dbStats.total,
+        activeInMemory: memoryStats.activeConversations,
+        leadsGenerated: dbStats.withLeads,
+        conversionRate: dbStats.total > 0
+          ? ((dbStats.withLeads / dbStats.total) * 100).toFixed(1) + '%'
+          : '0%',
+        averageMessagesPerConversation: dbStats.avgMessages
+      }
+    });
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.status(500).json({ error: 'Failed to get stats' });
+  }
 }
 
 export default {
