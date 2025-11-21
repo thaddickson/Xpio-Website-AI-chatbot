@@ -143,6 +143,10 @@ export async function sendLeadNotification(lead) {
         email: process.env.EMAIL_FROM || 'thad@xpiohealth.com',
         name: process.env.EMAIL_FROM_NAME || 'Xpio Health Delphi AI'
       },
+      replyTo: {
+        email: process.env.NOTIFICATION_EMAIL || 'thad@xpiohealth.com',
+        name: 'Xpio Health Team'
+      },
       subject: `${qualityBadge} Lead: ${lead.name} - ${lead.organization || 'Individual'}`,
       html: emailBody,
     };
