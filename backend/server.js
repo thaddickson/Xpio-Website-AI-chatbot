@@ -111,9 +111,14 @@ async function startServer() {
     await initializeDatabase();
 
     // Test email configuration (optional)
-    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
-      console.log('📧 Testing email configuration...');
-      await testEmailConfiguration();
+    if (process.env.SENDGRID_API_KEY) {
+      console.log('📧 Testing SendGrid configuration...');
+      try {
+        await testEmailConfiguration();
+      } catch (error) {
+        console.log('⚠️  Email configuration has issues but server will continue');
+        console.log('   Leads will be saved to database without email notifications');
+      }
     } else {
       console.log('⚠️  Email not configured (leads will be saved to database only)');
     }

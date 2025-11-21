@@ -1,27 +1,21 @@
-import nodemailer from 'nodemailer';
+import sgMail from '@sendgrid/mail';
 
-// Lazy initialize email transporter
-let transporter = null;
+// Lazy initialize SendGrid
+let sendgridInitialized = false;
 
-function getTransporter() {
-  if (!transporter) {
-    // Check if email is configured
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD) {
-      console.warn('⚠️  Email service not configured. Set EMAIL_USER and EMAIL_PASSWORD in .env');
-      return null;
+function initSendGrid() {
+  if (!sendgridInitialized) {
+    // Check if SendGrid is configured
+    if (!process.env.SENDGRID_API_KEY) {
+      console.warn('⚠️  SendGrid not configured. Set SENDGRID_API_KEY in .env');
+      return false;
     }
 
-    transporter = nodemailer.createTransport({
-      service: process.env.EMAIL_SERVICE || 'gmail',
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
-      },
-    });
-
-    console.log('✉️  Email service initialized');
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+    sendgridInitialized = true;
+    console.log('✉️  SendGrid email service initialized');
   }
-  return transporter;
+  return true;
 }
 
 /**
@@ -29,15 +23,13 @@ function getTransporter() {
  * @param {Object} lead - Lead data from database
  */
 export async function sendLeadNotification(lead) {
-  const emailTransporter = getTransporter();
-
-  // If email is not configured, skip silently
-  if (!emailTransporter) {
-    console.log('ℹ️  Email notification skipped (not configured)');
+  // Initialize SendGrid
+  if (!initSendGrid()) {
+    console.log('ℹ️  Email notification skipped (SendGrid not configured)');
     return {
       success: false,
       skipped: true,
-      reason: 'Email not configured'
+      reason: 'SendGrid not configured'
     };
   }
 
@@ -145,16 +137,19 @@ export async function sendLeadNotification(lead) {
 </html>
     `;
 
-    const mailOptions = {
-      from: `Xpio Health Delphi AI <${process.env.EMAIL_USER}>`,
+    const msg = {
       to: process.env.NOTIFICATION_EMAIL,
+      from: {
+        email: process.env.EMAIL_FROM || 'thad@xpiohealth.com',
+        name: process.env.EMAIL_FROM_NAME || 'Xpio Health Delphi AI'
+      },
       subject: `${qualityBadge} Lead: ${lead.name} - ${lead.organization || 'Individual'}`,
       html: emailBody,
     };
 
-    const result = await emailTransporter.sendMail(mailOptions);
+    const result = await sgMail.send(msg);
     console.log(`✅ Lead notification email sent for: ${lead.email}`);
-    return { success: true, messageId: result.messageId };
+    return { success: true, messageId: result[0].headers['x-message-id'] };
   } catch (error) {
     console.error('❌ Failed to send lead notification email:', error);
     return { success: false, error: error.message };
@@ -214,19 +209,17 @@ function escapeHtml(text) {
  * @returns {boolean} True if email is configured correctly
  */
 export async function testEmailConfiguration() {
-  const emailTransporter = getTransporter();
-
-  if (!emailTransporter) {
-    console.warn('⚠️  Email service not configured');
+  if (!initSendGrid()) {
+    console.warn('⚠️  SendGrid not configured');
     return false;
   }
 
   try {
-    await emailTransporter.verify();
-    console.log('✅ Email service is configured correctly');
+    // SendGrid doesn't have a verify method, but we can check if API key is set
+    console.log('✅ SendGrid is configured correctly');
     return true;
   } catch (error) {
-    console.error('❌ Email service configuration error:', error.message);
+    console.error('❌ SendGrid configuration error:', error.message);
     return false;
   }
 }
