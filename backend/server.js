@@ -124,7 +124,8 @@ async function startServer() {
     }
 
     // Start server
-    app.listen(PORT, () => {
+    const HOST = process.env.HOST || '0.0.0.0';
+    app.listen(PORT, HOST, () => {
       console.log('');
       console.log('✅ Server is running!');
       console.log('');
