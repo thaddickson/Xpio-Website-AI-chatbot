@@ -9,8 +9,8 @@ Copy everything between the lines below and paste into WordPress:
 <script>
   XpioChatbot.init({
     apiUrl: 'https://xpio-website-ai-chatbot-production.up.railway.app',
-    primaryColor: '#FC922B',
-    position: 'bottom-left'
+    primaryColor: '#2B2B2B',
+    position: 'bottom-right'
   });
 </script>
 

@@ -13,9 +13,9 @@
   const XpioChatbot = {
     config: {
       apiUrl: '',
-      primaryColor: '#FC922B',
-      secondaryColor: '#2B2B2B',
-      accentColor: '#BF5409',
+      primaryColor: '#2B2B2B',
+      secondaryColor: '#1a1a1a',
+      accentColor: '#3a3a3a',
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
