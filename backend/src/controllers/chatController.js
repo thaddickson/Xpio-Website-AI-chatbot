@@ -1,6 +1,7 @@
 import { chatWithClaude, getInitialGreeting } from '../services/claudeService.js';
 import { saveLead } from '../services/leadService.js';
 import Conversation from '../models/Conversation.js';
+import Prompt from '../models/Prompt.js';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -24,8 +25,35 @@ const conversations = new Map();
 // Conversation timeout (30 minutes)
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000;
 
-// System prompt from claudeService
-import { SYSTEM_PROMPT, LEAD_CAPTURE_TOOL } from '../services/claudeService.js';
+// System prompt - loaded from database and cached
+let cachedSystemPrompt = null;
+let lastPromptLoad = null;
+const PROMPT_CACHE_DURATION = 5 * 60 * 1000; // Refresh every 5 minutes
+
+async function getSystemPrompt() {
+  const now = Date.now();
+
+  // Use cache if it's recent
+  if (cachedSystemPrompt && lastPromptLoad && (now - lastPromptLoad < PROMPT_CACHE_DURATION)) {
+    return cachedSystemPrompt;
+  }
+
+  try {
+    // Load from database
+    cachedSystemPrompt = await Prompt.buildSystemPrompt();
+    lastPromptLoad = now;
+    console.log('✓ Loaded system prompt from database');
+    return cachedSystemPrompt;
+  } catch (error) {
+    console.error('Failed to load prompt from database, using fallback:', error);
+    // Fallback to hardcoded prompt if database fails
+    const { SYSTEM_PROMPT } = await import('../services/claudeService.js');
+    return SYSTEM_PROMPT;
+  }
+}
+
+// Import fallback prompt and tool definition
+import { LEAD_CAPTURE_TOOL } from '../services/claudeService.js';
 
 /**
  * Clean up old conversations periodically
@@ -122,11 +150,14 @@ export async function handleChatStream(req, res) {
     let toolUseDetected = null;
 
     try {
+      // Get system prompt from database
+      const systemPrompt = await getSystemPrompt();
+
       // Create streaming request to Claude
       const stream = await getAnthropic().messages.stream({
         model: 'claude-opus-4-20250514',
         max_tokens: 4096,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         tools: [LEAD_CAPTURE_TOOL],
         messages: conversationData.messages,
         temperature: 0.7,
@@ -204,7 +235,7 @@ export async function handleChatStream(req, res) {
           const followUpResponse = await getAnthropic().messages.create({
             model: 'claude-opus-4-20250514',
             max_tokens: 2048,
-            system: SYSTEM_PROMPT,
+            system: systemPrompt,
             messages: conversationData.messages,
           });
 

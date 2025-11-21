@@ -1,0 +1,35 @@
+================================================
+WORDPRESS INTEGRATION CODE - READY TO PASTE
+================================================
+
+Copy everything between the lines below and paste into WordPress:
+
+<!-- Xpio Health AI Chatbot -->
+<script src="https://xpio-website-ai-chatbot-production.up.railway.app/chat-widget.js"></script>
+<script>
+  XpioChatbot.init({
+    apiUrl: 'https://xpio-website-ai-chatbot-production.up.railway.app',
+    primaryColor: '#FC922B',
+    position: 'bottom-left'
+  });
+</script>
+
+================================================
+WHERE TO PASTE THIS IN WORDPRESS:
+================================================
+
+1. Log into WordPress at: https://xpiohealth.com/wp-admin
+
+2. Go to: Appearance → Theme File Editor
+
+3. Click on: footer.php (in the right sidebar)
+
+4. Scroll to the bottom and find: </body>
+
+5. Paste the code RIGHT BEFORE </body>
+
+6. Click "Update File"
+
+7. Visit https://xpiohealth.com - you should see the chat bubble!
+
+================================================

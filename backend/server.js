@@ -12,6 +12,15 @@ import {
   handleEndConversation,
   handleGetStats
 } from './src/controllers/chatController.js';
+import {
+  getAllPrompts,
+  getPromptBySlug,
+  createPrompt,
+  updatePrompt,
+  deletePrompt,
+  getPromptHistory,
+  previewSystemPrompt
+} from './src/controllers/promptController.js';
 import { initializeDatabase } from './src/models/Lead.js';
 import { testEmailConfiguration } from './src/services/emailService.js';
 import { chatRateLimiter } from './src/middleware/rateLimiter.js';
@@ -92,6 +101,16 @@ app.post('/api/chat/end', handleEndConversation);
 
 // Stats endpoint (consider adding authentication in production)
 app.get('/api/stats', handleGetStats);
+
+// Admin endpoints for prompt management
+// TODO: Add authentication middleware
+app.get('/api/admin/prompts/preview', previewSystemPrompt);
+app.get('/api/admin/prompts/:id/history', getPromptHistory);
+app.get('/api/admin/prompts/:slug', getPromptBySlug);
+app.get('/api/admin/prompts', getAllPrompts);
+app.post('/api/admin/prompts', createPrompt);
+app.put('/api/admin/prompts/:id', updatePrompt);
+app.delete('/api/admin/prompts/:id', deletePrompt);
 
 // 404 handler
 app.use((req, res) => {
