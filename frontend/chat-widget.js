@@ -305,7 +305,7 @@
      */
     createWidget() {
       const widgetHTML = `
-        <button class="xpio-chatbot-button" id="xpio-chat-toggle" aria-label="Open chat">
+        <button class="xpio-chatbot-button" id="xpio-chat-toggle" aria-label="Open chat" title="Xpio Delphi AI Chat">
           💬
         </button>
 
