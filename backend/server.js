@@ -19,7 +19,8 @@ import {
   updatePrompt,
   deletePrompt,
   getPromptHistory,
-  previewSystemPrompt
+  previewSystemPrompt,
+  importHardcodedPrompt
 } from './src/controllers/promptController.js';
 import { initializeDatabase } from './src/models/Lead.js';
 import { testEmailConfiguration } from './src/services/emailService.js';
@@ -104,6 +105,7 @@ app.get('/api/stats', handleGetStats);
 
 // Admin endpoints for prompt management
 // TODO: Add authentication middleware
+app.post('/api/admin/prompts/import', importHardcodedPrompt);
 app.get('/api/admin/prompts/preview', previewSystemPrompt);
 app.get('/api/admin/prompts/:id/history', getPromptHistory);
 app.get('/api/admin/prompts/:slug', getPromptBySlug);

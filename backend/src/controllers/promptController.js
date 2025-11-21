@@ -131,6 +131,44 @@ export async function previewSystemPrompt(req, res) {
   }
 }
 
+/**
+ * Import hardcoded prompt as initial database entry
+ * POST /api/admin/prompts/import
+ */
+export async function importHardcodedPrompt(req, res) {
+  try {
+    // Check if we already have prompts
+    const existing = await Prompt.getAll();
+    if (existing.length > 0) {
+      return res.status(400).json({
+        error: 'Prompts already exist in database. Delete them first if you want to re-import.'
+      });
+    }
+
+    // Import the hardcoded prompt
+    const { SYSTEM_PROMPT } = await import('../services/claudeService.js');
+
+    const prompt = await Prompt.create({
+      name: 'Main System Prompt',
+      slug: 'main-system-prompt',
+      description: 'Imported from hardcoded claudeService.js',
+      content: SYSTEM_PROMPT,
+      is_active: true,
+      display_order: 1,
+      last_edited_by: 'import-script'
+    });
+
+    res.json({
+      message: 'Hardcoded prompt imported successfully!',
+      prompt,
+      note: 'You can now edit this in the admin dashboard'
+    });
+  } catch (error) {
+    console.error('Error importing hardcoded prompt:', error);
+    res.status(500).json({ error: 'Failed to import prompt: ' + error.message });
+  }
+}
+
 export default {
   getAllPrompts,
   getPromptBySlug,
@@ -138,5 +176,6 @@ export default {
   updatePrompt,
   deletePrompt,
   getPromptHistory,
-  previewSystemPrompt
+  previewSystemPrompt,
+  importHardcodedPrompt
 };
