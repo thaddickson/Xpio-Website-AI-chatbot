@@ -17,7 +17,7 @@
       secondaryColor: '#1a1a1a',
       accentColor: '#3a3a3a',
       userBubbleColor: '#0066FF', // Blue for user messages
-      aiBubbleColor: '#F0F0F0', // Light gray for AI messages
+      aiBubbleColor: '#E8E8E8', // Medium gray for AI messages - better visibility
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
@@ -209,6 +209,7 @@
           align-self: flex-start;
           border-bottom-left-radius: 4px;
           box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+          border: 1px solid #D0D0D0;
         }
 
         .xpio-message.assistant::before {

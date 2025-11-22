@@ -16,6 +16,8 @@
       primaryColor: '#FC922B',
       secondaryColor: '#2B2B2B',
       accentColor: '#BF5409',
+      userBubbleColor: '#FC922B', // Orange for user messages (brand color)
+      aiBubbleColor: '#E8E8E8', // Medium gray for AI messages - better visibility
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
@@ -178,17 +180,18 @@
         }
 
         .xpio-message.user {
-          background: ${this.config.primaryColor};
+          background: ${this.config.userBubbleColor};
           color: white;
           margin-left: auto;
           border-bottom-right-radius: 2px;
         }
 
         .xpio-message.assistant {
-          background: white;
-          color: #333;
+          background: ${this.config.aiBubbleColor};
+          color: #1a1a1a;
           border-bottom-left-radius: 2px;
           box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          border: 1px solid #D0D0D0;
         }
 
         .xpio-typing-indicator {
