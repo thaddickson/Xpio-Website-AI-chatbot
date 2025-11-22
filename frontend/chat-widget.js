@@ -127,7 +127,7 @@
 
         .xpio-chat-header {
           padding: 16px;
-          background: linear-gradient(135deg, ${this.config.primaryColor} 0%, ${this.config.accentColor} 100%);
+          background: #2B2B2B;
           color: white;
           border-radius: 16px 16px 0 0;
           display: flex;
@@ -139,6 +139,7 @@
           margin: 0;
           font-size: 16px;
           font-weight: 600;
+          color: ${this.config.primaryColor};
         }
 
         .xpio-chat-header button {
