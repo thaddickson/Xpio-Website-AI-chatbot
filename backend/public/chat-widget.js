@@ -285,6 +285,34 @@
           30% { transform: translateY(-10px); }
         }
 
+        .xpio-quick-actions {
+          padding: 8px 16px 0;
+          background: white;
+          border-top: 1px solid #e0e0e0;
+          display: flex;
+          gap: 8px;
+          justify-content: center;
+        }
+
+        .xpio-quick-action-btn {
+          padding: 8px 16px;
+          background: ${this.config.primaryColor};
+          color: white;
+          border: none;
+          border-radius: 20px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 600;
+          transition: all 0.2s;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .xpio-quick-action-btn:hover {
+          background: ${this.config.accentColor};
+          transform: translateY(-1px);
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
         .xpio-chat-input {
           padding: 16px;
           border-top: 1px solid #e0e0e0;
@@ -469,6 +497,12 @@
             <!-- Messages will be inserted here -->
           </div>
 
+          <div class="xpio-quick-actions">
+            <button class="xpio-quick-action-btn" id="xpio-schedule-btn" title="Schedule a meeting with Thad">
+              📅 Schedule a Meeting
+            </button>
+          </div>
+
           <div class="xpio-chat-input">
             <textarea
               id="xpio-chat-input"
@@ -507,6 +541,14 @@
       toggleBtn.addEventListener('click', () => this.toggleChat());
       closeBtn.addEventListener('click', () => this.toggleChat());
       sendBtn.addEventListener('click', () => this.sendMessage());
+
+      // Schedule meeting button
+      const scheduleBtn = document.getElementById('xpio-schedule-btn');
+      if (scheduleBtn) {
+        scheduleBtn.addEventListener('click', () => {
+          window.open('https://app.usemotion.com/meet/thad-dickson/9bhgxjj', '_blank');
+        });
+      }
 
       // Proactive message handlers
       if (proactiveMessage) {
