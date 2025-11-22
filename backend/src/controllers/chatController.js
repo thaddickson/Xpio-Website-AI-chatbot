@@ -54,7 +54,7 @@ async function getSystemPrompt() {
 }
 
 // Import fallback prompt and tool definitions
-import { LEAD_CAPTURE_TOOL, HANDOFF_TOOL } from '../services/claudeService.js';
+import { LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL } from '../services/claudeService.js';
 
 /**
  * Clean up old conversations periodically
@@ -182,7 +182,7 @@ export async function handleChatStream(req, res) {
         model: 'claude-opus-4-20250514',
         max_tokens: 4096,
         system: systemPrompt,
-        tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
+        tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],
         messages: conversationData.messages,
         temperature: 0.7,
       });
