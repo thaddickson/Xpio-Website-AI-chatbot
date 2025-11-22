@@ -19,8 +19,13 @@ export async function handleSlackEvents(req, res) {
 
     // Handle message events
     if (type === 'event_callback' && event?.type === 'message') {
-      // Ignore bot messages and message edits
-      if (event.bot_id || event.subtype) {
+      // Ignore bot messages, but allow thread broadcasts (subtype: 'thread_broadcast')
+      if (event.bot_id) {
+        return res.json({ ok: true });
+      }
+
+      // Ignore message edits, deletions, etc. but allow thread broadcasts
+      if (event.subtype && event.subtype !== 'thread_broadcast') {
         return res.json({ ok: true });
       }
 
