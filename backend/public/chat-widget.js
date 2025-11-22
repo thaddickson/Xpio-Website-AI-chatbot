@@ -17,7 +17,8 @@
       secondaryColor: '#1a1a1a',
       accentColor: '#BF5409', // Darker orange for hover states
       userBubbleColor: '#0066FF', // Blue for user messages
-      aiBubbleColor: '#FC922B', // Orange for AI messages - matches brand logo
+      aiBubbleColor: '#0066FF', // Blue for AI messages
+      humanBubbleColor: '#10b981', // Green for human/Slack messages
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
@@ -205,15 +206,30 @@
 
         .xpio-message.assistant {
           background: ${this.config.aiBubbleColor};
-          color: #1a1a1a;
+          color: white;
           align-self: flex-start;
           border-bottom-left-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-          border: 1px solid #D0D0D0;
+          box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
         }
 
         .xpio-message.assistant::before {
           content: '🤖';
+          position: absolute;
+          left: -32px;
+          top: 0;
+          font-size: 20px;
+        }
+
+        .xpio-message.human {
+          background: ${this.config.humanBubbleColor};
+          color: white;
+          align-self: flex-start;
+          border-bottom-left-radius: 4px;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+        }
+
+        .xpio-message.human::before {
+          content: '👨‍💼';
           position: absolute;
           left: -32px;
           top: 0;
@@ -656,10 +672,10 @@
           const data = await response.json();
 
           if (data.messages && data.messages.length > 0) {
-            // Display each new message from Slack
+            // Display each new message from Slack (human)
             data.messages.forEach(msg => {
               console.log('📨 New message from Slack:', msg.text);
-              this.addMessage('assistant', msg.text);
+              this.addMessage('human', msg.text);
             });
           }
         } catch (error) {

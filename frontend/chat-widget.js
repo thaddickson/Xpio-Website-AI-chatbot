@@ -16,8 +16,9 @@
       primaryColor: '#FC922B', // Orange brand color for button and header
       secondaryColor: '#2B2B2B',
       accentColor: '#BF5409', // Darker orange for hover states
-      userBubbleColor: '#FC922B', // Orange for user messages (brand color)
-      aiBubbleColor: '#FC922B', // Orange for AI messages - matches brand logo
+      userBubbleColor: '#0066FF', // Blue for user messages
+      aiBubbleColor: '#0066FF', // Blue for AI messages
+      humanBubbleColor: '#10b981', // Green for human/Slack messages
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
@@ -184,14 +185,21 @@
           color: white;
           margin-left: auto;
           border-bottom-right-radius: 2px;
+          box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
         }
 
         .xpio-message.assistant {
           background: ${this.config.aiBubbleColor};
-          color: #1a1a1a;
+          color: white;
           border-bottom-left-radius: 2px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-          border: 1px solid #D0D0D0;
+          box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
+        }
+
+        .xpio-message.human {
+          background: ${this.config.humanBubbleColor};
+          color: white;
+          border-bottom-left-radius: 2px;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
         }
 
         .xpio-typing-indicator {
