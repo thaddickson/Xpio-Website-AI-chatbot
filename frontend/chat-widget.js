@@ -13,11 +13,11 @@
   const XpioChatbot = {
     config: {
       apiUrl: '',
-      primaryColor: '#FC922B',
+      primaryColor: '#FC922B', // Orange brand color for button and header
       secondaryColor: '#2B2B2B',
-      accentColor: '#BF5409',
+      accentColor: '#BF5409', // Darker orange for hover states
       userBubbleColor: '#FC922B', // Orange for user messages (brand color)
-      aiBubbleColor: '#E8E8E8', // Medium gray for AI messages - better visibility
+      aiBubbleColor: '#FC922B', // Orange for AI messages - matches brand logo
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
