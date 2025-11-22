@@ -99,6 +99,28 @@ export async function handleChatStream(req, res) {
       });
     }
 
+    // SECURITY: Detect obvious prompt injection attempts
+    const suspiciousPatterns = [
+      /ignore\s+(all\s+)?(previous|prior)\s+instructions/i,
+      /disregard\s+(all\s+)?(previous|prior)\s+instructions/i,
+      /forget\s+(all\s+)?(previous|prior|everything)/i,
+      /you\s+are\s+now\s+(a|an)/i,
+      /pretend\s+(you|that)/i,
+      /reveal\s+(your\s+)?(system\s+)?prompt/i,
+      /show\s+(me\s+)?(your\s+)?(system\s+)?prompt/i,
+      /what\s+(is|are)\s+your\s+(system\s+)?instructions/i,
+      /new\s+instructions:/i,
+      /\[SYSTEM\]/i,
+      /\<SYSTEM\>/i
+    ];
+
+    const foundSuspicious = suspiciousPatterns.some(pattern => pattern.test(message));
+    if (foundSuspicious) {
+      console.warn(`⚠️ Prompt injection attempt detected in conversation ${clientConversationId || 'new'}: ${message.substring(0, 100)}`);
+      // Log to database for monitoring
+      // Don't block completely - Claude can handle it, but we log the attempt
+    }
+
     // Get or create conversation
     let conversationId = clientConversationId;
     let conversationData;
@@ -110,6 +132,7 @@ export async function handleChatStream(req, res) {
         id: conversationId,
         messages: [],
         leadCaptured: false,
+        handoffRequested: false,
         createdAt: Date.now(),
         lastActivity: Date.now()
       };
@@ -260,6 +283,26 @@ export async function handleChatStream(req, res) {
           fullResponse += '\n\n' + followUpText;
         } else if (toolUseDetected && toolUseDetected.name === 'request_human_help') {
           console.log(`🆘 Handoff requested for conversation: ${conversationId}`);
+
+          // SECURITY: Prevent handoff spam - only allow one handoff per conversation
+          if (conversationData.handoffRequested) {
+            console.warn(`⚠️ Handoff already requested for conversation: ${conversationId}`);
+            // Don't process duplicate handoff requests
+            const assistantMessage = {
+              role: 'assistant',
+              content: fullResponse
+            };
+            conversationData.messages.push(assistantMessage);
+            Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
+              .catch(err => console.error('Failed to log assistant message:', err));
+
+            // Send completion event
+            res.write(`data: ${JSON.stringify({ type: 'done', conversationId, leadCaptured: conversationData.leadCaptured })}\n\n`);
+            res.end();
+            return;
+          }
+
+          conversationData.handoffRequested = true;
 
           // Add assistant's response to history
           const assistantMessage = {
