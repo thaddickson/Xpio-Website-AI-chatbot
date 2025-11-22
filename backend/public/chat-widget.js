@@ -28,7 +28,9 @@
       conversationId: null,
       messages: [],
       isLoading: false,
-      currentStreamingMessage: ''
+      currentStreamingMessage: '',
+      isHandedOff: false,
+      pollingInterval: null
     },
 
     /**
@@ -508,6 +510,28 @@
       input.value = '';
       input.style.height = 'auto';
 
+      // If handed off to human, send to Slack thread instead of AI
+      if (this.state.isHandedOff) {
+        this.state.isLoading = true;
+        try {
+          await fetch(`${this.config.apiUrl}/api/slack/send-to-thread`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              conversationId: this.state.conversationId,
+              message: message
+            }),
+          });
+        } catch (error) {
+          console.error('Error sending to Slack:', error);
+        } finally {
+          this.state.isLoading = false;
+        }
+        return;
+      }
+
       // Show typing
       this.showTyping();
       this.state.isLoading = true;
@@ -556,6 +580,10 @@
                 } else if (data.type === 'lead_captured') {
                   console.log('✅ Lead captured!', data.leadId);
                   this.showLeadCapturedBadge();
+                } else if (data.type === 'handed_off') {
+                  console.log('🤝 Handed off to human!', data.threadTs);
+                  this.state.isHandedOff = true;
+                  this.startPollingForSlackMessages();
                 } else if (data.type === 'done') {
                   console.log('✅ Message complete');
                 } else if (data.type === 'error') {
@@ -587,6 +615,45 @@
       badge.textContent = '✓ Information captured - We\'ll be in touch soon!';
       messagesContainer.appendChild(badge);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    },
+
+    /**
+     * Start polling for Slack messages (when handed off to human)
+     */
+    startPollingForSlackMessages() {
+      console.log('🔄 Starting to poll for Slack messages...');
+
+      // Poll every 2 seconds
+      this.state.pollingInterval = setInterval(async () => {
+        try {
+          const response = await fetch(`${this.config.apiUrl}/api/slack/poll/${this.state.conversationId}`);
+
+          if (!response.ok) return;
+
+          const data = await response.json();
+
+          if (data.messages && data.messages.length > 0) {
+            // Display each new message from Slack
+            data.messages.forEach(msg => {
+              console.log('📨 New message from Slack:', msg.text);
+              this.addMessage('assistant', msg.text);
+            });
+          }
+        } catch (error) {
+          console.error('Error polling Slack messages:', error);
+        }
+      }, 2000);
+    },
+
+    /**
+     * Stop polling (when conversation ends)
+     */
+    stopPollingForSlackMessages() {
+      if (this.state.pollingInterval) {
+        clearInterval(this.state.pollingInterval);
+        this.state.pollingInterval = null;
+        console.log('🛑 Stopped polling for Slack messages');
+      }
     }
   };
 
