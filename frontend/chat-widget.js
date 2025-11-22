@@ -549,7 +549,7 @@
         return;
       }
 
-      // Show after 3 seconds
+      // Show after 2 seconds (fast engagement for 5-second attention span)
       setTimeout(() => {
         const proactiveMessage = document.getElementById('xpio-proactive-message');
         if (proactiveMessage && !this.state.isOpen) {
@@ -557,12 +557,12 @@
           sessionStorage.setItem('xpio_proactive_shown', 'true');
           this.state.hasShownProactiveGreeting = true;
 
-          // Auto-hide after 10 seconds if not interacted with
+          // Auto-hide after 8 seconds if not interacted with
           setTimeout(() => {
             this.hideProactiveMessage();
-          }, 10000);
+          }, 8000);
         }
-      }, 3000);
+      }, 2000);
     },
 
     /**
