@@ -613,10 +613,10 @@
           sessionStorage.setItem('xpio_proactive_shown', 'true');
           this.state.hasShownProactiveGreeting = true;
 
-          // Auto-hide after 8 seconds if not interacted with
+          // Auto-hide after 25 seconds if not interacted with
           setTimeout(() => {
             this.hideProactiveMessage();
-          }, 8000);
+          }, 25000);
         }
       }, 2000);
     },
