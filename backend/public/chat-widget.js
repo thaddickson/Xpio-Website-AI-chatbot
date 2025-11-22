@@ -264,7 +264,6 @@
           display: flex;
           gap: 8px;
           background: white;
-          border-radius: 0 0 12px 12px;
         }
 
         .xpio-chat-input textarea {
@@ -311,6 +310,25 @@
           border-radius: 4px;
           font-size: 12px;
           margin-top: 8px;
+        }
+
+        .xpio-privacy-footer {
+          padding: 8px 16px;
+          background: #f8f9fa;
+          border-top: 1px solid #e0e0e0;
+          text-align: center;
+          font-size: 11px;
+          color: #666;
+          border-radius: 0 0 16px 16px;
+        }
+
+        .xpio-privacy-footer a {
+          color: ${this.config.primaryColor};
+          text-decoration: none;
+        }
+
+        .xpio-privacy-footer a:hover {
+          text-decoration: underline;
         }
 
         @media (max-width: 768px) {
@@ -362,6 +380,10 @@
               rows="1"
             ></textarea>
             <button id="xpio-chat-send">Send</button>
+          </div>
+
+          <div class="xpio-privacy-footer">
+            By using this chat, you agree to our <a href="${this.config.apiUrl}/privacy-policy.html" target="_blank">Privacy Policy</a>
           </div>
         </div>
       `;
