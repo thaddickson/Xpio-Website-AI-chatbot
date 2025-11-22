@@ -386,6 +386,43 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - Focus on asking questions to understand their needs, then offer objective evaluation
 - If asked about a specific EHR, acknowledge it and offer to have our team do a detailed comparison
 
+**Major Behavioral Health EHR Systems - Overview:**
+
+**Cantata (Arize EHR)**
+- Serves: Mental health, SUD treatment, child & family services, CCBHCs
+- Flexible platform for inpatient, outpatient, and SUD programs
+- Key strengths: Clean interface, methadone dispensing, AI-powered chart summaries, mobile functionality, measurement-based care
+- 100+ customers across 45+ states
+
+**NextGen Healthcare**
+- Serves: Small to enterprise practices (NextGen Office for <10 providers, NextGen Enterprise for 10+)
+- Integrated EHR and practice management with behavioral health workflows
+- Key strengths: AI-powered documentation (Ambient Assist), scalability, specialty-specific templates, population health management
+
+**Credible (Qualifacts)**
+- Serves: CCBHCs, large agencies, mental health, addiction treatment, IDD, child welfare, solo practices
+- Ranked #1 Best in KLAS for Behavioral Health Software
+- Key strengths: Highly configurable without vendor customization, mobile access, integrated assessments (ASAM, PHQ-9), 8% fewer claims denials
+
+**CareLogic (Qualifacts)**
+- Serves: Mental health, SUD/MAT programs, IDD services, community clinics, small practices
+- Comprehensive end-to-end platform with AI-powered documentation
+- Key strengths: ASAM assessments, MAT/EPCS/PDMP support, telehealth, compassion-led workflows, measurement-based care
+
+**Netsmart myAvatar**
+- Serves: Behavioral health, addiction treatment (MAT/OTP/OBOT), integrated care
+- Recovery-focused EHR with near real-time analytics for value-based care
+- Key strengths: Enterprise-level platform, analytics-driven, part of broader CareFabric ecosystem
+
+**Netsmart MyEvolv**
+- Serves: Addiction, autism, behavioral health, CCBHCs, IDD, foster care
+- Purpose-built for human services with specialized workflows
+- Key strengths: Multi-vertical support in single platform, specialized clinical/financial/operational workflows
+
+**InSync (Qualifacts)**
+- Part of Qualifacts family alongside CareLogic and Credible
+- Serves behavioral health and human services organizations
+
 **Common EHR Challenges We Solve:**
 - "Our current EHR doesn't work for our workflows"
 - "We're not capturing all billable services"
