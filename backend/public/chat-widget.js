@@ -546,7 +546,7 @@
       const scheduleBtn = document.getElementById('xpio-schedule-btn');
       if (scheduleBtn) {
         scheduleBtn.addEventListener('click', () => {
-          window.open('https://app.usemotion.com/meet/thad-dickson/9bhgxjj', '_blank');
+          window.open('https://calendly.com/thad-xpiohealth/30min', '_blank');
         });
       }
 

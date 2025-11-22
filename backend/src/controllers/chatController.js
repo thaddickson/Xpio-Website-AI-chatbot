@@ -281,6 +281,70 @@ export async function handleChatStream(req, res) {
           // Stream the follow-up message
           res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
           fullResponse += '\n\n' + followUpText;
+        } else if (toolUseDetected && toolUseDetected.name === 'check_calendar_availability') {
+          console.log(`📅 Checking Calendly availability...`);
+
+          // Add assistant's response to history
+          const assistantMessage = {
+            role: 'assistant',
+            content: message.content
+          };
+          conversationData.messages.push(assistantMessage);
+
+          // Log assistant message to database (don't wait)
+          Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
+            .catch(err => console.error('Failed to log assistant message:', err));
+
+          // Get available times from Calendly
+          const { getAvailableTimes } = await import('../services/calendlyService.js');
+          let availabilityResult;
+          try {
+            availabilityResult = await getAvailableTimes();
+            console.log('📅 Calendly availability:', availabilityResult);
+          } catch (error) {
+            console.error('Failed to check Calendly availability:', error);
+            availabilityResult = {
+              available: false,
+              error: error.message,
+              message: "I'm having trouble checking the calendar right now.",
+              bookingLink: process.env.CALENDLY_EVENT_LINK
+            };
+          }
+
+          // Send tool result back to Claude
+          conversationData.messages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: toolUseDetected.id,
+              content: JSON.stringify(availabilityResult)
+            }]
+          });
+
+          // Get Claude's follow-up message with the availability info
+          console.log('💬 Getting follow-up message from Claude with availability...');
+          const followUpResponse = await chatWithClaude(conversationData.messages, conversationId);
+
+          let followUpText = '';
+          for (const block of followUpResponse.content) {
+            if (block.type === 'text') {
+              followUpText += block.text;
+            }
+          }
+
+          // Add follow-up to conversation history
+          conversationData.messages.push({
+            role: 'assistant',
+            content: followUpText
+          });
+
+          // Log follow-up message to database (don't wait)
+          Conversation.addMessage(conversationId, { role: 'assistant', content: followUpText })
+            .catch(err => console.error('Failed to log follow-up message:', err));
+
+          // Stream the follow-up message
+          res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
+          fullResponse += '\n\n' + followUpText;
         } else if (toolUseDetected && toolUseDetected.name === 'request_human_help') {
           console.log(`🆘 Handoff requested for conversation: ${conversationId}`);
 

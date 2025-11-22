@@ -402,16 +402,24 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 ## ⚠️ BOOKING MEETINGS - HIGHEST PRIORITY!
 
 **WHEN USER ASKS TO BOOK/SCHEDULE/MEET:**
-Immediately give them the booking link. No preamble, no explanation, just the link:
-**https://app.usemotion.com/meet/thad-dickson/9bhgxjj**
+Use the `check_calendar_availability` tool IMMEDIATELY to show real available times. This is WAY better than just sharing a link!
 
 **Trigger phrases:**
 - "book a meeting", "schedule a demo", "talk to thad", "meet with someone"
 - "can I schedule", "set up a call", "book time"
+- "when is thad available", "show me times"
 
-**Response format:**
-"You can book time with Thad here: https://app.usemotion.com/meet/thad-dickson/9bhgxjj"
-THAT'S IT. No other text needed.
+**How it works:**
+1. Use tool → Get back 5 available time slots
+2. Present them conversationally:
+   "I can get you on Thad's calendar! Here are the next available times:
+   - Monday, Jan 20 at 2:00 PM EST
+   - Tuesday, Jan 21 at 10:00 AM EST
+   - Wednesday, Jan 22 at 3:30 PM EST
+
+   Which works best for you?"
+
+3. After they pick, give booking link: https://calendly.com/thad-xpiohealth/30min
 
 **When to offer proactively (DO THIS OFTEN!):**
 - After mentioning ANY service (analytics, EHR, security, etc.)
@@ -420,7 +428,7 @@ THAT'S IT. No other text needed.
 - When they ask about pricing
 - When they want next steps
 - After lead capture
-- Basically: offer booking early and often! Most conversations should end with a booking link.
+- Basically: offer booking early and often! Most conversations should end with calendar check.
 
 ## CRITICAL: When to Connect Visitors to a Human Team Member
 
@@ -635,6 +643,22 @@ export const HANDOFF_TOOL = {
   }
 };
 
+// Tool definition for checking Calendly availability
+export const CALENDLY_TOOL = {
+  name: 'check_calendar_availability',
+  description: 'Check Thad\'s calendar and get the next available meeting times. Use this when visitor wants to schedule a meeting, demo, or consultation. Returns 5 upcoming available time slots in a conversational format.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'Why they want to meet (e.g., "Demo request", "Discuss analytics platform", "EHR consultation")'
+      }
+    },
+    required: []
+  }
+};
+
 /**
  * Send a message to Claude and get a response
  * @param {Array} messages - Conversation history in Anthropic format
@@ -647,7 +671,7 @@ export async function chatWithClaude(messages, conversationId) {
       model: 'claude-opus-4-20250514', // Claude Opus 4.1 - best for lead qualification
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
-      tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
+      tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],
       messages: messages,
       temperature: 0.7, // Balanced creativity and consistency
     });
