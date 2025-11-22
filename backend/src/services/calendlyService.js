@@ -75,8 +75,10 @@ export async function getAvailableTimes() {
     const eventTypeUri = await getEventTypeUuid();
 
     // Get availability for next 7 days
-    const startTime = new Date().toISOString();
-    const endTime = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    // Start 5 minutes from now to ensure it's "in the future"
+    const startTime = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+    // End time: 6 days 23 hours from start (under 7 day limit)
+    const endTime = new Date(Date.now() + 6.95 * 24 * 60 * 60 * 1000).toISOString();
 
     const response = await fetch(
       `https://api.calendly.com/event_type_available_times?event_type=${eventTypeUri}&start_time=${startTime}&end_time=${endTime}`,
@@ -90,7 +92,10 @@ export async function getAvailableTimes() {
     );
 
     if (!response.ok) {
-      throw new Error(`Calendly API error: ${response.status}`);
+      const errorBody = await response.text();
+      console.error('Calendly API error response:', errorBody);
+      console.error('Request URL:', `https://api.calendly.com/event_type_available_times?event_type=${eventTypeUri}&start_time=${startTime}&end_time=${endTime}`);
+      throw new Error(`Calendly API error: ${response.status} - ${errorBody}`);
     }
 
     const data = await response.json();
