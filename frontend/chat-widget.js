@@ -29,7 +29,8 @@
       conversationId: null,
       messages: [],
       isLoading: false,
-      currentStreamingMessage: ''
+      currentStreamingMessage: '',
+      hasShownProactiveGreeting: false
     },
 
     /**
@@ -51,6 +52,9 @@
 
       // Fetch initial greeting from API
       this.fetchGreeting();
+
+      // Show proactive greeting after delay
+      this.showProactiveGreeting();
 
       console.log('✅ Xpio Health Chatbot initialized');
     },
@@ -302,6 +306,70 @@
           margin-top: 8px;
         }
 
+        .xpio-proactive-message {
+          position: fixed;
+          ${this.config.position.includes('right') ? 'right: 90px;' : 'left: 90px;'}
+          bottom: 30px;
+          background: white;
+          padding: 12px 16px;
+          border-radius: 12px;
+          box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+          max-width: 280px;
+          font-size: 14px;
+          line-height: 1.4;
+          color: #333;
+          z-index: 9998;
+          animation: xpio-slide-in 0.4s ease-out;
+          display: none;
+        }
+
+        .xpio-proactive-message.show {
+          display: block;
+        }
+
+        .xpio-proactive-message::before {
+          content: '';
+          position: absolute;
+          ${this.config.position.includes('right') ? 'right: -8px;' : 'left: -8px;'}
+          bottom: 20px;
+          width: 0;
+          height: 0;
+          border-style: solid;
+          ${this.config.position.includes('right')
+            ? 'border-width: 8px 0 8px 8px; border-color: transparent transparent transparent white;'
+            : 'border-width: 8px 8px 8px 0; border-color: transparent white transparent transparent;'}
+        }
+
+        .xpio-proactive-close {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          background: none;
+          border: none;
+          color: #999;
+          cursor: pointer;
+          font-size: 16px;
+          padding: 0;
+          width: 20px;
+          height: 20px;
+          line-height: 1;
+        }
+
+        .xpio-proactive-close:hover {
+          color: #333;
+        }
+
+        @keyframes xpio-slide-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
         @media (max-width: 768px) {
           .xpio-chat-window {
             width: 100%;
@@ -333,6 +401,11 @@
         <button class="xpio-chatbot-button" id="xpio-chat-toggle" aria-label="Open chat" title="Xpio Delphi AI Chat">
           💬
         </button>
+
+        <div class="xpio-proactive-message" id="xpio-proactive-message">
+          <button class="xpio-proactive-close" id="xpio-proactive-close" aria-label="Close">×</button>
+          <div>👋 Hi! Need help with behavioral health technology? I'm here to answer your questions!</div>
+        </div>
 
         <div class="xpio-chat-window" id="xpio-chat-window">
           <div class="xpio-chat-header">
@@ -372,10 +445,29 @@
       const sendBtn = document.getElementById('xpio-chat-send');
       const input = document.getElementById('xpio-chat-input');
       const chatWindow = document.getElementById('xpio-chat-window');
+      const proactiveMessage = document.getElementById('xpio-proactive-message');
+      const proactiveClose = document.getElementById('xpio-proactive-close');
 
       toggleBtn.addEventListener('click', () => this.toggleChat());
       closeBtn.addEventListener('click', () => this.toggleChat());
       sendBtn.addEventListener('click', () => this.sendMessage());
+
+      // Proactive message handlers
+      if (proactiveMessage) {
+        proactiveMessage.addEventListener('click', (e) => {
+          if (e.target !== proactiveClose) {
+            this.hideProactiveMessage();
+            this.toggleChat();
+          }
+        });
+      }
+
+      if (proactiveClose) {
+        proactiveClose.addEventListener('click', (e) => {
+          e.stopPropagation();
+          this.hideProactiveMessage();
+        });
+      }
 
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
@@ -403,6 +495,41 @@
         }
       } catch (error) {
         console.error('Failed to fetch greeting:', error);
+      }
+    },
+
+    /**
+     * Show proactive greeting after delay
+     */
+    showProactiveGreeting() {
+      // Check if already shown in this session
+      if (sessionStorage.getItem('xpio_proactive_shown')) {
+        return;
+      }
+
+      // Show after 3 seconds
+      setTimeout(() => {
+        const proactiveMessage = document.getElementById('xpio-proactive-message');
+        if (proactiveMessage && !this.state.isOpen) {
+          proactiveMessage.classList.add('show');
+          sessionStorage.setItem('xpio_proactive_shown', 'true');
+          this.state.hasShownProactiveGreeting = true;
+
+          // Auto-hide after 10 seconds if not interacted with
+          setTimeout(() => {
+            this.hideProactiveMessage();
+          }, 10000);
+        }
+      }, 3000);
+    },
+
+    /**
+     * Hide proactive message
+     */
+    hideProactiveMessage() {
+      const proactiveMessage = document.getElementById('xpio-proactive-message');
+      if (proactiveMessage) {
+        proactiveMessage.classList.remove('show');
       }
     },
 
