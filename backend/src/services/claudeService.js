@@ -402,7 +402,7 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 ## ⚠️ BOOKING MEETINGS - HIGHEST PRIORITY!
 
 **WHEN USER ASKS TO BOOK/SCHEDULE/MEET:**
-Use the `check_calendar_availability` tool IMMEDIATELY to show real available times. This is WAY better than just sharing a link!
+Use the check_calendar_availability tool IMMEDIATELY to show real available times. This is WAY better than just sharing a link!
 
 **Trigger phrases:**
 - "book a meeting", "schedule a demo", "talk to thad", "meet with someone"
