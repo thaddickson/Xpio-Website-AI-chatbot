@@ -196,6 +196,19 @@
           box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
         }
 
+        .xpio-message.assistant::before {
+          content: '';
+          position: absolute;
+          left: -32px;
+          top: 0;
+          width: 24px;
+          height: 24px;
+          background-image: url('https://xpiohealth.com/wp-content/uploads/2022/04/Xpio-Health-Web-Logo.png');
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center;
+        }
+
         .xpio-message.human {
           background: ${this.config.humanBubbleColor};
           color: white;

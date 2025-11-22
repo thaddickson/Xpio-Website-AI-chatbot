@@ -214,11 +214,16 @@
         }
 
         .xpio-message.assistant::before {
-          content: '🤖';
+          content: '';
           position: absolute;
           left: -32px;
           top: 0;
-          font-size: 20px;
+          width: 24px;
+          height: 24px;
+          background-image: url('https://xpiohealth.com/wp-content/uploads/2022/04/Xpio-Health-Web-Logo.png');
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center;
         }
 
         .xpio-message.human {
