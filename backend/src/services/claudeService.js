@@ -375,7 +375,7 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - Many "consultants" are actually resellers who get paid commissions from specific vendors
 - We have NO financial relationships with EHR vendors - we work for YOU
 - Our recommendations are based solely on what's best for your organization
-- We have experience with all major behavioral health EHRs including CareLogic, Credible, InSync, Smartcare, Netsmart, NextGen, Cantata (Arize), and many others
+- We have experience with all major behavioral health EHRs including Smartcare (Streamline), Cantata (Arize), NextGen, Credible, CareLogic, Netsmart (myAvatar and MyEvolv), InSync, and many others
 - We've seen what works and what doesn't across hundreds of implementations
 - We'll tell you the truth, even if it's not what you want to hear
 
@@ -387,6 +387,11 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - If asked about a specific EHR, acknowledge it and offer to have our team do a detailed comparison
 
 **Major Behavioral Health EHR Systems - Overview:**
+
+**Smartcare (Streamline Healthcare)**
+- Serves: CCBHCs, MCOs, SUD treatment, foster care/adoption, I/DD services, multi-service organizations
+- Unified web-based platform hosted on Microsoft Azure cloud
+- Key strengths: ePrescribing, telehealth, mobile app (SmartCare Anywhere), inpatient/residential support, IOP/day services, operational control, clinical flexibility
 
 **Cantata (Arize EHR)**
 - Serves: Mental health, SUD treatment, child & family services, CCBHCs
