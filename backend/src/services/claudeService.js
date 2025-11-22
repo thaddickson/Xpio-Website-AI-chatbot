@@ -440,6 +440,19 @@ Bad AI: "Here are available times..." ❌ NO!
 
 **IMPORTANT:** Only qualified leads get to see the calendar. Name + email + phone = qualified.
 
+**🚨 MANDATORY AFTER SAVING LEAD 🚨**
+IMMEDIATELY after using save_lead tool successfully:
+1. Use check_calendar_availability tool (NO EXCEPTIONS!)
+2. Show the actual available times to the user
+3. NEVER say "I don't have access to the calendar" - YOU DO! Use the tool!
+4. NEVER say "someone will reach out" - SHOW THE TIMES YOURSELF!
+
+**If user asks about times/availability:**
+- "what times are available"
+- "when can you meet"
+- "show me the calendar"
+→ Use check_calendar_availability tool IMMEDIATELY (if you have their contact info already)
+
 **When to offer booking proactively:**
 - After 2-3 messages showing genuine interest
 - After they ask about specific services
@@ -662,7 +675,7 @@ export const HANDOFF_TOOL = {
 // Tool definition for checking Calendly availability
 export const CALENDLY_TOOL = {
   name: 'check_calendar_availability',
-  description: 'Check Thad\'s calendar availability and return the next 5 available meeting time slots. IMPORTANT: Only use this AFTER you have collected the lead\'s name, email, and phone number. Use the save_lead tool first, then use this tool to show available times. Returns 5 upcoming time slots in conversational format with dates and times.',
+  description: 'MANDATORY: Use this IMMEDIATELY after save_lead succeeds OR when user asks about meeting times/availability. This returns Thad\'s actual available calendar slots from Calendly. You DO have calendar access via this tool - use it! Returns 5 real upcoming time slots. Required flow: save_lead → check_calendar_availability → show times. NEVER say "I don\'t have calendar access" - you have this tool!',
   input_schema: {
     type: 'object',
     properties: {
