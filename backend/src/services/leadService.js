@@ -1,5 +1,6 @@
 import Lead from '../models/Lead.js';
 import { sendLeadNotification } from './emailService.js';
+import { sendLeadToSlack } from './slackService.js';
 
 /**
  * Save a new lead and send notifications
@@ -37,6 +38,11 @@ export async function saveLead(leadData, conversationId, conversationHistory) {
     // Send email notification (don't wait for it)
     sendLeadNotification(lead).catch(err => {
       console.error('Failed to send notification email:', err);
+    });
+
+    // Send Slack notification (don't wait for it)
+    sendLeadToSlack(lead).catch(err => {
+      console.error('Failed to send Slack notification:', err);
     });
 
     // Optional: Send to CRM (implement if needed)
