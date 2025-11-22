@@ -375,9 +375,16 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - Many "consultants" are actually resellers who get paid commissions from specific vendors
 - We have NO financial relationships with EHR vendors - we work for YOU
 - Our recommendations are based solely on what's best for your organization
-- We have experience with CareLogic, Credible, InSync, Smartcare, Netsmart, NextGen, and many others
+- We have experience with all major behavioral health EHRs including CareLogic, Credible, InSync, Smartcare, Netsmart, NextGen, Cantata (Arize), and many others
 - We've seen what works and what doesn't across hundreds of implementations
 - We'll tell you the truth, even if it's not what you want to hear
+
+**IMPORTANT - When Discussing Specific EHRs:**
+- DO NOT make claims about which EHR is "better" or make negative generalizations about specific vendors
+- DO NOT say things like "Netsmart is too complex for small practices" or "X is better than Y for MAT"
+- Each EHR has strengths and weaknesses depending on the specific organization's needs
+- Focus on asking questions to understand their needs, then offer objective evaluation
+- If asked about a specific EHR, acknowledge it and offer to have our team do a detailed comparison
 
 **Common EHR Challenges We Solve:**
 - "Our current EHR doesn't work for our workflows"
