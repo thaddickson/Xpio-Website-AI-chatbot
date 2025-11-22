@@ -314,13 +314,63 @@
   <script>
     const API_URL = window.location.origin;
     let prompts = [];
+    let adminPassword = null;
+
+    // Get admin password
+    function getAdminPassword() {
+      if (!adminPassword) {
+        adminPassword = sessionStorage.getItem('adminPassword');
+      }
+
+      if (!adminPassword) {
+        adminPassword = prompt('Enter admin password:');
+        if (adminPassword) {
+          sessionStorage.setItem('adminPassword', adminPassword);
+        }
+      }
+
+      return adminPassword;
+    }
+
+    // Get auth headers
+    function getAuthHeaders(contentType = true) {
+      const headers = {};
+      const password = getAdminPassword();
+
+      if (password) {
+        headers['Authorization'] = `Bearer ${password}`;
+      }
+
+      if (contentType) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      return headers;
+    }
+
+    // Handle auth errors
+    function handleAuthError(response) {
+      if (response.status === 401 || response.status === 403) {
+        sessionStorage.removeItem('adminPassword');
+        adminPassword = null;
+        alert('Invalid password. Please try again.');
+        location.reload();
+        return true;
+      }
+      return false;
+    }
 
     // Load prompts on page load
     window.addEventListener('DOMContentLoaded', loadPrompts);
 
     async function loadPrompts() {
       try {
-        const response = await fetch(`${API_URL}/api/admin/prompts`);
+        const response = await fetch(`${API_URL}/api/admin/prompts`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+
         const data = await response.json();
         prompts = data.prompts;
         renderPrompts();
@@ -408,10 +458,11 @@
 
         const response = await fetch(url, {
           method,
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify(data)
         });
 
+        if (handleAuthError(response)) return;
         if (!response.ok) throw new Error('Failed to save');
 
         showSuccess(id ? 'Section updated successfully!' : 'Section created successfully!');
@@ -426,10 +477,11 @@
       try {
         const response = await fetch(`${API_URL}/api/admin/prompts/${id}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: getAuthHeaders(),
           body: JSON.stringify({ is_active: isActive })
         });
 
+        if (handleAuthError(response)) return;
         if (!response.ok) throw new Error('Failed to update');
 
         showSuccess(isActive ? 'Section activated!' : 'Section deactivated!');
@@ -444,9 +496,11 @@
 
       try {
         const response = await fetch(`${API_URL}/api/admin/prompts/${id}`, {
-          method: 'DELETE'
+          method: 'DELETE',
+          headers: getAuthHeaders(false)
         });
 
+        if (handleAuthError(response)) return;
         if (!response.ok) throw new Error('Failed to delete');
 
         showSuccess('Section deleted successfully!');
@@ -461,7 +515,12 @@
       document.getElementById('previewContent').textContent = 'Loading preview...';
 
       try {
-        const response = await fetch(`${API_URL}/api/admin/prompts/preview`);
+        const response = await fetch(`${API_URL}/api/admin/prompts/preview`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+
         const data = await response.json();
 
         document.getElementById('previewStats').innerHTML = `

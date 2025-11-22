@@ -113,16 +113,46 @@ app.post('/api/slack/events', handleSlackEvents); // Webhook for Slack messages
 app.get('/api/slack/poll/:conversationId', pollSlackMessages); // Poll for new human messages
 app.post('/api/slack/send-to-thread', sendToSlackThread); // Send visitor message to Slack thread
 
-// Admin endpoints for prompt management
-// TODO: Add authentication middleware
-app.post('/api/admin/prompts/import', importHardcodedPrompt);
-app.get('/api/admin/prompts/preview', previewSystemPrompt);
-app.get('/api/admin/prompts/:id/history', getPromptHistory);
-app.get('/api/admin/prompts/:slug', getPromptBySlug);
-app.get('/api/admin/prompts', getAllPrompts);
-app.post('/api/admin/prompts', createPrompt);
-app.put('/api/admin/prompts/:id', updatePrompt);
-app.delete('/api/admin/prompts/:id', deletePrompt);
+// Admin authentication middleware
+const adminAuth = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+
+  // If no password is set, warn but allow (for backward compatibility during setup)
+  if (!adminPassword) {
+    console.warn('⚠️  WARNING: ADMIN_PASSWORD not set! Admin endpoints are unprotected!');
+    return next();
+  }
+
+  // Check for Bearer token
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Admin password required. Please set Authorization header.'
+    });
+  }
+
+  const providedPassword = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+  if (providedPassword !== adminPassword) {
+    return res.status(403).json({
+      error: 'Forbidden',
+      message: 'Invalid admin password'
+    });
+  }
+
+  next();
+};
+
+// Admin endpoints for prompt management (protected)
+app.post('/api/admin/prompts/import', adminAuth, importHardcodedPrompt);
+app.get('/api/admin/prompts/preview', adminAuth, previewSystemPrompt);
+app.get('/api/admin/prompts/:id/history', adminAuth, getPromptHistory);
+app.get('/api/admin/prompts/:slug', adminAuth, getPromptBySlug);
+app.get('/api/admin/prompts', adminAuth, getAllPrompts);
+app.post('/api/admin/prompts', adminAuth, createPrompt);
+app.put('/api/admin/prompts/:id', adminAuth, updatePrompt);
+app.delete('/api/admin/prompts/:id', adminAuth, deletePrompt);
 
 // 404 handler
 app.use((req, res) => {
