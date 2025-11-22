@@ -283,6 +283,34 @@ export async function requestHandoff(conversationId, conversationHistory, visito
 }
 
 /**
+ * Send a message to an existing Slack thread
+ * @param {string} threadTs - Thread timestamp to reply to
+ * @param {string} message - Message content from visitor
+ * @param {string} conversationId - Conversation ID for context
+ */
+export async function sendMessageToThread(threadTs, message, conversationId) {
+  if (!initSlack()) {
+    console.log('ℹ️  Slack message skipped (not configured)');
+    return { success: false, skipped: true };
+  }
+
+  try {
+    const result = await slackClient.chat.postMessage({
+      channel: process.env.SLACK_CHANNEL_ID,
+      thread_ts: threadTs,
+      text: `*Visitor (${conversationId}):* ${message}`,
+      mrkdwn: true
+    });
+
+    console.log(`✅ Visitor message sent to Slack thread: ${threadTs}`);
+    return { success: true, ts: result.ts };
+  } catch (error) {
+    console.error('❌ Failed to send message to Slack thread:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Test Slack configuration
  */
 export async function testSlackConfiguration() {
@@ -304,4 +332,4 @@ export async function testSlackConfiguration() {
   }
 }
 
-export default { sendLeadToSlack, requestHandoff, testSlackConfiguration };
+export default { sendLeadToSlack, requestHandoff, sendMessageToThread, testSlackConfiguration };

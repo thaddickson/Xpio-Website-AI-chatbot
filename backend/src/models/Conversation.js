@@ -193,6 +193,55 @@ class Conversation {
   }
 
   /**
+   * Mark conversation as handed off to human
+   * @param {string} conversationId - Unique conversation identifier
+   * @param {string} slackThreadTs - Slack thread timestamp for replies
+   * @param {string} handedOffTo - Name of person handling it
+   * @returns {boolean} Success status
+   */
+  static async markHandedOff(conversationId, slackThreadTs, handedOffTo = 'Xpio Team') {
+    try {
+      const { error } = await getSupabase()
+        .from('conversations')
+        .update({
+          is_handed_off: true,
+          slack_thread_ts: slackThreadTs,
+          handed_off_at: new Date().toISOString(),
+          handed_off_to: handedOffTo
+        })
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+      console.log(`🤝 Conversation ${conversationId} handed off to ${handedOffTo}`);
+      return true;
+    } catch (error) {
+      console.error('Database error marking handoff:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get handoff state for a conversation
+   * @param {string} conversationId - Unique conversation identifier
+   * @returns {Object} Handoff state
+   */
+  static async getHandoffState(conversationId) {
+    try {
+      const { data, error } = await getSupabase()
+        .from('conversations')
+        .select('is_handed_off, slack_thread_ts, handed_off_to')
+        .eq('conversation_id', conversationId)
+        .single();
+
+      if (error) throw error;
+      return data || { is_handed_off: false, slack_thread_ts: null, handed_off_to: null };
+    } catch (error) {
+      console.error('Database error getting handoff state:', error);
+      return { is_handed_off: false, slack_thread_ts: null, handed_off_to: null };
+    }
+  }
+
+  /**
    * Get conversation statistics
    * @returns {Object} Stats about conversations
    */

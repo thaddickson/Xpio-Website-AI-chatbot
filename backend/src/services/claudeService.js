@@ -430,14 +430,23 @@ Try to gather as much as possible, but at minimum need name and email:
 - Budget range (if mentioned)
 
 ## Response Style
-- Keep responses conversational but professional
-- Use short paragraphs for readability
-- Ask one or two questions at a time, not a long list
-- Show empathy for their challenges
-- Demonstrate expertise without being condescending
-- Use healthcare terminology appropriately
+CRITICAL - Keep responses SHORT and CONCISE:
+- Maximum 2-3 sentences per response
+- Use short paragraphs (1-2 sentences each)
+- Ask ONE question at a time, never multiple questions
+- Be conversational and friendly, not formal or wordy
+- Get to the point quickly - no long explanations unless asked
+- Use bullet points only when absolutely necessary
+- Avoid repeating information already discussed
+- Don't list multiple services unless specifically asked
+- Focus on understanding their specific need, not showcasing everything you know
 
-Remember: Your goal is to have a helpful conversation that identifies qualified leads who would benefit from speaking with the Xpio Health sales team. Focus on quality over quantity.`;
+EXAMPLES:
+❌ BAD (too verbose): "Xpio Health provides comprehensive technology and consulting services including EHR consulting, analytics platforms, cybersecurity, HIE integration, and more. Our vendor-neutral approach means we recommend what's best for you. We have expertise across 12 states with CareLogic, Credible, InSync, and other systems. What specific challenges are you facing?"
+
+✅ GOOD (concise): "We help behavioral health organizations with EHR selection, analytics, and cybersecurity. What's your main challenge right now?"
+
+Remember: Be helpful but brief. Quality conversation, not quantity of words. If they want more details, they'll ask.`;
 
 // Tool definition for lead capture
 export const LEAD_CAPTURE_TOOL = {
@@ -508,6 +517,39 @@ export const LEAD_CAPTURE_TOOL = {
   }
 };
 
+// Tool definition for handoff to human
+export const HANDOFF_TOOL = {
+  name: 'request_human_help',
+  description: 'Request immediate handoff to a human team member when the visitor explicitly asks to speak with someone, needs complex technical assistance you cannot provide, or when they express urgency that requires real-time human interaction. Use this when AI assistance is insufficient.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reason: {
+        type: 'string',
+        description: 'Brief explanation of why human assistance is needed (e.g., "Visitor requested to speak with sales", "Complex technical question about EHR integration", "Pricing negotiation needed")'
+      },
+      visitor_name: {
+        type: 'string',
+        description: 'Visitor\'s name if collected'
+      },
+      visitor_email: {
+        type: 'string',
+        description: 'Visitor\'s email if collected'
+      },
+      urgency: {
+        type: 'string',
+        enum: ['low', 'medium', 'high'],
+        description: 'Urgency level - HIGH if they need immediate help, MEDIUM if important but can wait a few minutes, LOW if general inquiry'
+      },
+      context_summary: {
+        type: 'string',
+        description: 'Brief summary of what was discussed so the human team member can pick up the conversation smoothly'
+      }
+    },
+    required: ['reason', 'urgency', 'context_summary']
+  }
+};
+
 /**
  * Send a message to Claude and get a response
  * @param {Array} messages - Conversation history in Anthropic format
@@ -520,7 +562,7 @@ export async function chatWithClaude(messages, conversationId) {
       model: 'claude-opus-4-20250514', // Claude Opus 4.1 - best for lead qualification
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
-      tools: [LEAD_CAPTURE_TOOL],
+      tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
       messages: messages,
       temperature: 0.7, // Balanced creativity and consistency
     });

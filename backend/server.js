@@ -22,6 +22,11 @@ import {
   previewSystemPrompt,
   importHardcodedPrompt
 } from './src/controllers/promptController.js';
+import {
+  handleSlackEvents,
+  pollSlackMessages,
+  sendToSlackThread
+} from './src/controllers/slackController.js';
 import { initializeDatabase } from './src/models/Lead.js';
 import { testEmailConfiguration } from './src/services/emailService.js';
 import { chatRateLimiter } from './src/middleware/rateLimiter.js';
@@ -102,6 +107,11 @@ app.post('/api/chat/end', handleEndConversation);
 
 // Stats endpoint (consider adding authentication in production)
 app.get('/api/stats', handleGetStats);
+
+// Slack integration endpoints
+app.post('/api/slack/events', handleSlackEvents); // Webhook for Slack messages
+app.get('/api/slack/poll/:conversationId', pollSlackMessages); // Poll for new human messages
+app.post('/api/slack/send-to-thread', sendToSlackThread); // Send visitor message to Slack thread
 
 // Admin endpoints for prompt management
 // TODO: Add authentication middleware

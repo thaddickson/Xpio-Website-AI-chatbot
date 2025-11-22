@@ -16,6 +16,8 @@
       primaryColor: '#2B2B2B',
       secondaryColor: '#1a1a1a',
       accentColor: '#3a3a3a',
+      userBubbleColor: '#0066FF', // Blue for user messages
+      aiBubbleColor: '#F0F0F0', // Light gray for AI messages
       position: 'bottom-right', // bottom-right, bottom-left
       greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
       placeholder: "Type your message..."
@@ -161,34 +163,66 @@
         .xpio-chat-messages {
           flex: 1;
           overflow-y: auto;
-          padding: 16px;
+          padding: 20px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
-          background: #f8f9fa;
+          gap: 16px;
+          background: #ffffff;
         }
 
         .xpio-message {
-          padding: 12px;
-          border-radius: 8px;
-          max-width: 80%;
+          padding: 12px 16px;
+          border-radius: 18px;
+          max-width: 75%;
           word-wrap: break-word;
           line-height: 1.5;
           font-size: 14px;
+          position: relative;
+          animation: xpio-message-in 0.3s ease;
+        }
+
+        @keyframes xpio-message-in {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .xpio-message.user {
-          background: ${this.config.primaryColor};
+          background: ${this.config.userBubbleColor};
           color: white;
           margin-left: auto;
-          border-bottom-right-radius: 2px;
+          align-self: flex-end;
+          border-bottom-right-radius: 4px;
+          box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
         }
 
         .xpio-message.assistant {
-          background: white;
-          color: #333;
-          border-bottom-left-radius: 2px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          background: ${this.config.aiBubbleColor};
+          color: #1a1a1a;
+          align-self: flex-start;
+          border-bottom-left-radius: 4px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .xpio-message.assistant::before {
+          content: '🤖';
+          position: absolute;
+          left: -32px;
+          top: 0;
+          font-size: 20px;
+        }
+
+        .xpio-message.user::before {
+          content: '👤';
+          position: absolute;
+          right: -32px;
+          top: 0;
+          font-size: 20px;
         }
 
         .xpio-typing-indicator {

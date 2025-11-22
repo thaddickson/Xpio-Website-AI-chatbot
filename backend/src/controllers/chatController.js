@@ -1,5 +1,6 @@
 import { chatWithClaude, getInitialGreeting } from '../services/claudeService.js';
 import { saveLead } from '../services/leadService.js';
+import { requestHandoff } from '../services/slackService.js';
 import Conversation from '../models/Conversation.js';
 import Prompt from '../models/Prompt.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -232,6 +233,87 @@ export async function handleChatStream(req, res) {
           });
 
           // Get Claude's follow-up message (non-streaming for simplicity)
+          const followUpResponse = await getAnthropic().messages.create({
+            model: 'claude-opus-4-20250514',
+            max_tokens: 2048,
+            system: systemPrompt,
+            messages: conversationData.messages,
+          });
+
+          const followUpText = followUpResponse.content
+            .filter(block => block.type === 'text')
+            .map(block => block.text)
+            .join('');
+
+          const followUpMessage = {
+            role: 'assistant',
+            content: followUpText
+          };
+          conversationData.messages.push(followUpMessage);
+
+          // Log follow-up message to database (don't wait)
+          Conversation.addMessage(conversationId, followUpMessage)
+            .catch(err => console.error('Failed to log follow-up message:', err));
+
+          // Stream the follow-up message
+          res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
+          fullResponse += '\n\n' + followUpText;
+        } else if (toolUseDetected && toolUseDetected.name === 'request_human_help') {
+          console.log(`🆘 Handoff requested for conversation: ${conversationId}`);
+
+          // Add assistant's response to history
+          const assistantMessage = {
+            role: 'assistant',
+            content: message.content
+          };
+          conversationData.messages.push(assistantMessage);
+
+          // Log assistant message to database (don't wait)
+          Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
+            .catch(err => console.error('Failed to log assistant message:', err));
+
+          // Request handoff via Slack
+          let handoffResult;
+          try {
+            handoffResult = await requestHandoff(
+              conversationId,
+              conversationData.messages,
+              {
+                name: toolUseDetected.input.visitor_name,
+                email: toolUseDetected.input.visitor_email,
+                reason: toolUseDetected.input.reason,
+                urgency: toolUseDetected.input.urgency,
+                context: toolUseDetected.input.context_summary
+              }
+            );
+
+            // Mark conversation as handed off in database
+            if (handoffResult.success && handoffResult.threadTs) {
+              Conversation.markHandedOff(conversationId, handoffResult.threadTs)
+                .catch(err => console.error('Failed to mark handoff in database:', err));
+            }
+
+            res.write(`data: ${JSON.stringify({ type: 'handed_off', threadTs: handoffResult.threadTs })}\n\n`);
+          } catch (error) {
+            console.error('Failed to request handoff:', error);
+            handoffResult = {
+              success: false,
+              error: 'Failed to connect you with a team member. Please try again.'
+            };
+            res.write(`data: ${JSON.stringify({ type: 'error', error: 'Failed to request handoff' })}\n\n`);
+          }
+
+          // Send tool result back to Claude
+          conversationData.messages.push({
+            role: 'user',
+            content: [{
+              type: 'tool_result',
+              tool_use_id: toolUseDetected.id,
+              content: JSON.stringify(handoffResult)
+            }]
+          });
+
+          // Get Claude's follow-up message
           const followUpResponse = await getAnthropic().messages.create({
             model: 'claude-opus-4-20250514',
             max_tokens: 2048,
