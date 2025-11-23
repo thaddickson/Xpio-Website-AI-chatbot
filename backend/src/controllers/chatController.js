@@ -175,6 +175,35 @@ export async function handleChatStream(req, res) {
     let toolUseDetected = null;
 
     try {
+      // Check if conversation is handed off and if human is still active
+      const handoffState = await Conversation.getHandoffState(conversationId);
+
+      if (handoffState.is_handed_off) {
+        // Check when last human message was
+        const lastHumanMessage = conversationData.messages
+          .filter(m => m.from === 'human')
+          .pop();
+
+        const timeSinceLastHuman = lastHumanMessage
+          ? Date.now() - new Date(lastHumanMessage.timestamp || conversationData.lastActivity).getTime()
+          : Date.now() - conversationData.lastActivity;
+
+        // If human responded in last 2 minutes, don't let AI interfere
+        if (lastHumanMessage && timeSinceLastHuman < 120000) {
+          console.log(`🙋 Human is active in conversation ${conversationId}, AI staying silent`);
+          res.write(`data: ${JSON.stringify({
+            type: 'handed_off',
+            message: 'Our team member is helping you now. They will respond shortly.'
+          })}\n\n`);
+          res.write(`data: ${JSON.stringify({ type: 'done', conversationId })}\n\n`);
+          res.end();
+          return;
+        }
+
+        // If we get here, human hasn't responded in 2+ minutes, AI can resume
+        console.log(`🤖 Human inactive for ${Math.floor(timeSinceLastHuman/1000)}s, AI resuming conversation ${conversationId}`);
+      }
+
       // Get system prompt from database
       const systemPrompt = await getSystemPrompt();
 
@@ -352,24 +381,7 @@ export async function handleChatStream(req, res) {
         } else if (toolUseDetected && toolUseDetected.name === 'request_human_help') {
           console.log(`🆘 Handoff requested for conversation: ${conversationId}`);
 
-          // SECURITY: Prevent handoff spam - only allow one handoff per conversation
-          if (conversationData.handoffRequested) {
-            console.warn(`⚠️ Handoff already requested for conversation: ${conversationId}`);
-            // Don't process duplicate handoff requests
-            const assistantMessage = {
-              role: 'assistant',
-              content: fullResponse
-            };
-            conversationData.messages.push(assistantMessage);
-            Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
-              .catch(err => console.error('Failed to log assistant message:', err));
-
-            // Send completion event
-            res.write(`data: ${JSON.stringify({ type: 'done', conversationId, leadCaptured: conversationData.leadCaptured })}\n\n`);
-            res.end();
-            return;
-          }
-
+          // Track that handoff was requested (for stats, but don't block future AI responses)
           conversationData.handoffRequested = true;
 
           // Add assistant's response to history
