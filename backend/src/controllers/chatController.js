@@ -2,6 +2,7 @@ import { chatWithClaude, getInitialGreeting } from '../services/claudeService.js
 import { saveLead } from '../services/leadService.js';
 import { requestHandoff } from '../services/slackService.js';
 import Conversation from '../models/Conversation.js';
+import Lead from '../models/Lead.js';
 import Prompt from '../models/Prompt.js';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
@@ -284,6 +285,9 @@ export async function handleChatStream(req, res) {
         } else if (toolUseDetected && toolUseDetected.name === 'check_calendar_availability') {
           console.log(`📅 Checking Calendly availability...`);
 
+          // Track calendar check
+          conversationData.calendarChecked = true;
+
           // Add assistant's response to history
           const assistantMessage = {
             role: 'assistant',
@@ -527,33 +531,34 @@ export function handleEndConversation(req, res) {
  */
 export async function handleGetStats(req, res) {
   try {
-    // Get in-memory stats
-    const memoryStats = {
-      activeConversations: conversations.size,
-      conversations: Array.from(conversations.values()).map(conv => ({
-        id: conv.id,
-        messageCount: conv.messages.length,
-        leadCaptured: conv.leadCaptured,
-        age: Math.floor((Date.now() - conv.createdAt) / 1000 / 60) + ' minutes',
-        lastActivity: Math.floor((Date.now() - conv.lastActivity) / 1000) + ' seconds ago'
-      }))
-    };
-
     // Get database stats
     const dbStats = await Conversation.getStats();
 
+    // Get recent leads (last 10)
+    const recentLeads = await Lead.getAll(10, 0);
+
+    // Count tool usage in conversations
+    let handoffsRequested = 0;
+    let calendarChecks = 0;
+
+    Array.from(conversations.values()).forEach(conv => {
+      if (conv.handoffRequested) handoffsRequested++;
+      if (conv.calendarChecked) calendarChecks++;
+    });
+
+    // Return stats in format expected by frontend
     res.json({
-      memory: memoryStats,
-      database: dbStats,
-      combined: {
-        totalConversations: dbStats.total,
-        activeInMemory: memoryStats.activeConversations,
-        leadsGenerated: dbStats.withLeads,
-        conversionRate: dbStats.total > 0
-          ? ((dbStats.withLeads / dbStats.total) * 100).toFixed(1) + '%'
-          : '0%',
-        averageMessagesPerConversation: dbStats.avgMessages
-      }
+      totalConversations: dbStats.total || 0,
+      totalLeads: dbStats.withLeads || 0,
+      activeConversations: conversations.size,
+      handoffsRequested,
+      calendarChecks,
+      recentLeads: recentLeads.map(lead => ({
+        name: lead.name,
+        email: lead.email,
+        primary_interest: lead.primary_interest,
+        created_at: lead.created_at
+      }))
     });
   } catch (error) {
     console.error('Error getting stats:', error);
