@@ -114,12 +114,13 @@ app.get('/api/slack/poll/:conversationId', pollSlackMessages); // Poll for new h
 app.post('/api/slack/send-to-thread', sendToSlackThread); // Send visitor message to Slack thread
 
 // Admin authentication middleware
+// Supports multiple admin passwords separated by commas
 const adminAuth = (req, res, next) => {
   const authHeader = req.headers.authorization;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  const adminPasswordsEnv = process.env.ADMIN_PASSWORD;
 
   // If no password is set, warn but allow (for backward compatibility during setup)
-  if (!adminPassword) {
+  if (!adminPasswordsEnv) {
     console.warn('⚠️  WARNING: ADMIN_PASSWORD not set! Admin endpoints are unprotected!');
     return next();
   }
@@ -134,7 +135,10 @@ const adminAuth = (req, res, next) => {
 
   const providedPassword = authHeader.substring(7); // Remove 'Bearer ' prefix
 
-  if (providedPassword !== adminPassword) {
+  // Support multiple passwords separated by commas
+  const validPasswords = adminPasswordsEnv.split(',').map(p => p.trim());
+
+  if (!validPasswords.includes(providedPassword)) {
     return res.status(403).json({
       error: 'Forbidden',
       message: 'Invalid admin password'
