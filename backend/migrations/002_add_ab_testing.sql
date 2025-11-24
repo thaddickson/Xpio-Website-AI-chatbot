@@ -6,7 +6,7 @@
 -- Stores different versions of prompt sections for A/B testing
 CREATE TABLE IF NOT EXISTS prompt_variations (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  prompt_section_id UUID NOT NULL, -- Links to prompts.id
+  prompt_section_id UUID NOT NULL, -- Links to prompt_sections.id
   variation_name VARCHAR(100) NOT NULL, -- e.g., "Control", "Version A", "Shorter Greeting"
   content TEXT NOT NULL,
   is_active BOOLEAN DEFAULT false, -- Whether this variation is being tested
@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS prompt_variations (
   created_by VARCHAR(100),
   notes TEXT, -- Notes about what this variation is testing
   CONSTRAINT fk_prompt_section FOREIGN KEY (prompt_section_id)
-    REFERENCES prompts(id) ON DELETE CASCADE
+    REFERENCES prompt_sections(id) ON DELETE CASCADE
 );
 
 -- Table: conversation_test_assignments
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS conversation_test_assignments (
   CONSTRAINT fk_variation FOREIGN KEY (variation_id)
     REFERENCES prompt_variations(id) ON DELETE CASCADE,
   CONSTRAINT fk_prompt FOREIGN KEY (prompt_section_id)
-    REFERENCES prompts(id) ON DELETE CASCADE
+    REFERENCES prompt_sections(id) ON DELETE CASCADE
 );
 
 -- Table: variation_performance_metrics
