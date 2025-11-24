@@ -339,34 +339,12 @@
     <!-- A/B Testing Tab -->
     <div id="testing-tab" class="tab-content">
       <div class="actions">
-        <button onclick="window.location.href='#docs'">📖 View Testing Guide</button>
+        <button onclick="loadVariations()">🔄 Refresh</button>
+        <button class="secondary" onclick="switchTab('docs')">📖 View Guide</button>
       </div>
 
-      <div style="padding: 20px; background: white; border-radius: 8px;">
-        <h2>🧪 A/B Testing & Prompt Variations</h2>
-        <p style="color: #666; margin: 20px 0;">A/B testing features are coming soon to the admin dashboard!</p>
-
-        <h3 style="margin-top: 30px;">What You'll Be Able To Do:</h3>
-        <ul style="line-height: 2; color: #666;">
-          <li>✅ Create multiple versions of any prompt section</li>
-          <li>✅ Allocate traffic percentage (e.g., 50% to Variant A, 50% Control)</li>
-          <li>✅ Track performance metrics (conversion rate, handoff rate, etc.)</li>
-          <li>✅ View side-by-side performance comparisons</li>
-          <li>✅ Promote winning variations to become the new standard</li>
-        </ul>
-
-        <h3 style="margin-top: 30px;">Currently Available:</h3>
-        <p style="color: #666;">The A/B testing system is fully functional via API. See the <strong>📖 Docs</strong> tab for complete instructions on how to:</p>
-        <ul style="line-height: 2; color: #666;">
-          <li>Create and manage variations via API</li>
-          <li>Set up your first test</li>
-          <li>Track performance metrics</li>
-          <li>Graduate winning variations</li>
-        </ul>
-
-        <div style="margin-top: 30px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
-          <strong>💡 Quick Start:</strong> Switch to the <strong>📖 Docs</strong> tab to view the complete A/B Testing Guide with API examples and best practices.
-        </div>
+      <div id="variationsContainer" class="loading">
+        Loading A/B testing data...
       </div>
     </div>
 
@@ -446,6 +424,54 @@
     </div>
   </div>
 
+  <!-- Variation Modal -->
+  <div id="variationModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="variationModalTitle">Create Variation</h2>
+        <button class="close-btn" onclick="closeVariationModal()">×</button>
+      </div>
+
+      <form id="variationForm" onsubmit="saveVariation(event)">
+        <input type="hidden" id="variationId">
+        <input type="hidden" id="variationPromptId">
+
+        <div class="form-group">
+          <label for="variationName">Variation Name</label>
+          <input type="text" id="variationName" required placeholder="e.g., Short Greeting, Version A">
+        </div>
+
+        <div class="form-group">
+          <label for="variationContent">Content</label>
+          <textarea id="variationContent" required placeholder="Enter the variation content..." style="min-height: 200px;"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="variationTraffic">Traffic Percentage: <span id="trafficValue">0</span>%</label>
+          <input type="range" id="variationTraffic" min="0" max="100" value="0" style="width: 100%;" oninput="document.getElementById('trafficValue').textContent = this.value">
+          <small style="color: #666;">What percentage of conversations should use this variation?</small>
+        </div>
+
+        <div class="form-group">
+          <label for="variationNotes">Notes (optional)</label>
+          <textarea id="variationNotes" placeholder="What are you testing with this variation?" rows="3"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="variationActive">
+            Active (start testing immediately)
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="submit">💾 Save Variation</button>
+          <button type="button" class="secondary" onclick="closeVariationModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     let prompts = [];
@@ -514,6 +540,8 @@
         loadStats();
       } else if (tabName === 'docs') {
         loadDocs();
+      } else if (tabName === 'testing') {
+        loadVariations();
       }
     }
 
@@ -858,6 +886,307 @@
       const div = document.createElement('div');
       div.textContent = text;
       return div.innerHTML;
+    }
+
+    // ========== A/B TESTING / VARIATIONS MANAGEMENT ==========
+
+    let allVariations = {};
+
+    async function loadVariations() {
+      const container = document.getElementById('variationsContainer');
+      container.innerHTML = '<div class="loading">Loading variations...</div>';
+
+      try {
+        // Load all prompts first
+        const promptsResponse = await fetch(`${API_URL}/api/admin/prompts`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(promptsResponse)) return;
+
+        const { prompts: allPrompts } = await promptsResponse.json();
+
+        // Load variations for each prompt
+        const variationsData = await Promise.all(
+          allPrompts.map(async (prompt) => {
+            try {
+              const response = await fetch(`${API_URL}/api/admin/prompts/${prompt.id}/variations`, {
+                headers: getAuthHeaders(false)
+              });
+              const { variations } = await response.json();
+              return { prompt, variations: variations || [] };
+            } catch (error) {
+              console.error(`Error loading variations for ${prompt.name}:`, error);
+              return { prompt, variations: [] };
+            }
+          })
+        );
+
+        allVariations = variationsData;
+        renderVariations(variationsData);
+      } catch (error) {
+        container.innerHTML = `<div class="error">Failed to load variations: ${error.message}</div>`;
+      }
+    }
+
+    function renderVariations(data) {
+      const container = document.getElementById('variationsContainer');
+
+      if (data.length === 0) {
+        container.innerHTML = '<div class="loading">No prompt sections found.</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
+          <strong>💡 How it works:</strong> Create variations of any prompt section, allocate traffic percentage, and track which performs better. <a href="#" onclick="switchTab('docs'); return false;">View Guide →</a>
+        </div>
+      ` + data.map(({ prompt, variations }) => {
+        const totalTraffic = variations.filter(v => v.is_active).reduce((sum, v) => sum + v.traffic_percentage, 0);
+        const controlTraffic = 100 - totalTraffic;
+
+        return `
+          <div class="section-card" style="margin-bottom: 20px;">
+            <div class="section-header">
+              <div>
+                <div class="section-title">${escapeHtml(prompt.name)}</div>
+                <div class="section-meta">
+                  ${variations.length} variation${variations.length !== 1 ? 's' : ''} •
+                  Control: ${controlTraffic}% •
+                  ${variations.filter(v => v.is_active).length} active
+                </div>
+              </div>
+              <button onclick="showCreateVariationModal('${prompt.id}', '${escapeHtml(prompt.name)}')" style="padding: 6px 12px; font-size: 12px;">
+                ➕ New Variation
+              </button>
+            </div>
+
+            ${variations.length > 0 ? `
+              <div style="margin-top: 15px;">
+                ${variations.map(v => renderVariationCard(v, prompt)).join('')}
+              </div>
+            ` : `
+              <div style="padding: 20px; text-align: center; color: #999; background: #f9f9f9; border-radius: 5px; margin-top: 10px;">
+                No variations yet. Create one to start testing!
+              </div>
+            `}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderVariationCard(variation, prompt) {
+      const statusColor = variation.is_active ? '#4CAF50' : '#999';
+      const statusText = variation.is_active ? 'Active' : 'Inactive';
+
+      return `
+        <div style="background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid ${statusColor};">
+          <div style="display: flex; justify-content: space-between; align-items: start;">
+            <div style="flex: 1;">
+              <div style="font-weight: 600; margin-bottom: 5px;">
+                ${escapeHtml(variation.variation_name)}
+                <span style="display: inline-block; padding: 2px 8px; background: ${statusColor}; color: white; border-radius: 3px; font-size: 11px; margin-left: 8px;">
+                  ${statusText}
+                </span>
+              </div>
+              <div style="font-size: 13px; color: #666; margin-bottom: 8px;">
+                Traffic: ${variation.traffic_percentage}% •
+                Created: ${new Date(variation.created_at).toLocaleDateString()}
+              </div>
+              ${variation.notes ? `<div style="font-size: 12px; color: #666; font-style: italic; margin-bottom: 8px;">${escapeHtml(variation.notes)}</div>` : ''}
+              <div style="font-size: 12px; font-family: 'Courier New', monospace; color: #333; background: white; padding: 10px; border-radius: 3px; max-height: 100px; overflow-y: auto;">
+                ${escapeHtml(variation.content.substring(0, 200))}${variation.content.length > 200 ? '...' : ''}
+              </div>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 10px;">
+            <button onclick="editVariation('${variation.id}', '${prompt.id}')" style="padding: 4px 10px; font-size: 12px;">✏️ Edit</button>
+            <button onclick="toggleVariationActive('${variation.id}', '${prompt.id}', ${!variation.is_active})" style="padding: 4px 10px; font-size: 12px;">
+              ${variation.is_active ? '⏸️ Pause' : '▶️ Activate'}
+            </button>
+            <button onclick="viewPerformance('${variation.id}', '${prompt.id}')" style="padding: 4px 10px; font-size: 12px;">📊 Performance</button>
+            ${variation.is_active ? `
+              <button onclick="promoteVariation('${variation.id}', '${prompt.id}', '${escapeHtml(variation.variation_name)}')" style="padding: 4px 10px; font-size: 12px; background: #4CAF50;">
+                🏆 Promote to Base
+              </button>
+            ` : ''}
+            <button onclick="deleteVariation('${variation.id}', '${prompt.id}')" class="secondary" style="padding: 4px 10px; font-size: 12px; margin-left: auto;">🗑️ Delete</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function showCreateVariationModal(promptId, promptName) {
+      document.getElementById('variationModalTitle').textContent = `Create Variation for "${promptName}"`;
+      document.getElementById('variationForm').reset();
+      document.getElementById('variationId').value = '';
+      document.getElementById('variationPromptId').value = promptId;
+      document.getElementById('trafficValue').textContent = '0';
+      document.getElementById('variationModal').classList.add('active');
+    }
+
+    async function editVariation(variationId, promptId) {
+      try {
+        // Find the variation in our cached data
+        const promptData = allVariations.find(v => v.prompt.id === promptId);
+        const variation = promptData?.variations.find(v => v.id === variationId);
+
+        if (!variation) {
+          showError('Variation not found');
+          return;
+        }
+
+        document.getElementById('variationModalTitle').textContent = 'Edit Variation';
+        document.getElementById('variationId').value = variation.id;
+        document.getElementById('variationPromptId').value = promptId;
+        document.getElementById('variationName').value = variation.variation_name;
+        document.getElementById('variationContent').value = variation.content;
+        document.getElementById('variationTraffic').value = variation.traffic_percentage;
+        document.getElementById('trafficValue').textContent = variation.traffic_percentage;
+        document.getElementById('variationNotes').value = variation.notes || '';
+        document.getElementById('variationActive').checked = variation.is_active;
+        document.getElementById('variationModal').classList.add('active');
+      } catch (error) {
+        showError('Failed to load variation: ' + error.message);
+      }
+    }
+
+    async function saveVariation(event) {
+      event.preventDefault();
+
+      const variationId = document.getElementById('variationId').value;
+      const promptId = document.getElementById('variationPromptId').value;
+      const data = {
+        variation_name: document.getElementById('variationName').value,
+        content: document.getElementById('variationContent').value,
+        traffic_percentage: parseInt(document.getElementById('variationTraffic').value),
+        notes: document.getElementById('variationNotes').value,
+        is_active: document.getElementById('variationActive').checked
+      };
+
+      try {
+        if (variationId) {
+          // Update existing
+          const response = await fetch(`${API_URL}/api/admin/variations/${variationId}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+          });
+
+          if (handleAuthError(response)) return;
+          if (!response.ok) throw new Error('Failed to update');
+
+          showSuccess('Variation updated successfully!');
+        } else {
+          // Create new
+          const response = await fetch(`${API_URL}/api/admin/prompts/${promptId}/variations`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+          });
+
+          if (handleAuthError(response)) return;
+          if (!response.ok) throw new Error('Failed to create');
+
+          showSuccess('Variation created successfully!');
+        }
+
+        closeVariationModal();
+        loadVariations();
+      } catch (error) {
+        showError('Failed to save variation: ' + error.message);
+      }
+    }
+
+    async function toggleVariationActive(variationId, promptId, isActive) {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/variations/${variationId}`, {
+          method: 'PUT',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ is_active: isActive })
+        });
+
+        if (handleAuthError(response)) return;
+        if (!response.ok) throw new Error('Failed to update');
+
+        showSuccess(isActive ? 'Variation activated!' : 'Variation paused!');
+        loadVariations();
+      } catch (error) {
+        showError('Failed to toggle variation: ' + error.message);
+      }
+    }
+
+    async function deleteVariation(variationId, promptId) {
+      if (!confirm('Are you sure you want to delete this variation? This cannot be undone.')) return;
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/variations/${variationId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+        if (!response.ok) throw new Error('Failed to delete');
+
+        showSuccess('Variation deleted successfully!');
+        loadVariations();
+      } catch (error) {
+        showError('Failed to delete variation: ' + error.message);
+      }
+    }
+
+    async function promoteVariation(variationId, promptId, variationName) {
+      if (!confirm(`Promote "${variationName}" to be the new base prompt?\n\nThis will:\n- Replace the current base prompt with this variation\n- Deactivate all tests for this section\n- Everyone will get this version going forward`)) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/variations/${variationId}/promote`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ prompt_section_id: promptId })
+        });
+
+        if (handleAuthError(response)) return;
+        if (!response.ok) throw new Error('Failed to promote');
+
+        showSuccess('🎉 Variation promoted to base prompt! All tests deactivated.');
+        loadVariations();
+        loadPrompts(); // Refresh prompts tab too
+      } catch (error) {
+        showError('Failed to promote variation: ' + error.message);
+      }
+    }
+
+    async function viewPerformance(variationId, promptId) {
+      try {
+        const response = await fetch(`${API_URL}/api/admin/prompts/${promptId}/variations/performance?days=30`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+        const data = await response.json();
+
+        const variation = data.variations.find(v => v.variation_id === variationId);
+
+        if (!variation) {
+          showError('No performance data yet. Wait for some conversations to use this variation.');
+          return;
+        }
+
+        alert(`Performance for "${variation.variation_name}":\n\n` +
+          `Conversations: ${variation.total_conversations}\n` +
+          `Leads Captured: ${variation.total_leads}\n` +
+          `Conversion Rate: ${variation.conversion_rate}%\n\n` +
+          `This is a basic view. Full dashboard coming soon!`
+        );
+      } catch (error) {
+        showError('Failed to load performance data: ' + error.message);
+      }
+    }
+
+    function closeVariationModal() {
+      document.getElementById('variationModal').classList.remove('active');
     }
   </script>
 
