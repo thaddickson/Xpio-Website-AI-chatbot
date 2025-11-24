@@ -307,6 +307,8 @@
     <div class="tabs">
       <button class="tab active" onclick="switchTab('prompts')">📝 Prompts</button>
       <button class="tab" onclick="switchTab('stats')">📊 Statistics</button>
+      <button class="tab" onclick="switchTab('testing')">🧪 A/B Testing</button>
+      <button class="tab" onclick="switchTab('docs')">📖 Docs</button>
     </div>
 
     <!-- Prompts Tab -->
@@ -331,6 +333,51 @@
 
       <div id="statsContainer" class="loading">
         Loading statistics...
+      </div>
+    </div>
+
+    <!-- A/B Testing Tab -->
+    <div id="testing-tab" class="tab-content">
+      <div class="actions">
+        <button onclick="window.location.href='#docs'">📖 View Testing Guide</button>
+      </div>
+
+      <div style="padding: 20px; background: white; border-radius: 8px;">
+        <h2>🧪 A/B Testing & Prompt Variations</h2>
+        <p style="color: #666; margin: 20px 0;">A/B testing features are coming soon to the admin dashboard!</p>
+
+        <h3 style="margin-top: 30px;">What You'll Be Able To Do:</h3>
+        <ul style="line-height: 2; color: #666;">
+          <li>✅ Create multiple versions of any prompt section</li>
+          <li>✅ Allocate traffic percentage (e.g., 50% to Variant A, 50% Control)</li>
+          <li>✅ Track performance metrics (conversion rate, handoff rate, etc.)</li>
+          <li>✅ View side-by-side performance comparisons</li>
+          <li>✅ Promote winning variations to become the new standard</li>
+        </ul>
+
+        <h3 style="margin-top: 30px;">Currently Available:</h3>
+        <p style="color: #666;">The A/B testing system is fully functional via API. See the <strong>📖 Docs</strong> tab for complete instructions on how to:</p>
+        <ul style="line-height: 2; color: #666;">
+          <li>Create and manage variations via API</li>
+          <li>Set up your first test</li>
+          <li>Track performance metrics</li>
+          <li>Graduate winning variations</li>
+        </ul>
+
+        <div style="margin-top: 30px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
+          <strong>💡 Quick Start:</strong> Switch to the <strong>📖 Docs</strong> tab to view the complete A/B Testing Guide with API examples and best practices.
+        </div>
+      </div>
+    </div>
+
+    <!-- Documentation Tab -->
+    <div id="docs-tab" class="tab-content">
+      <div class="actions">
+        <button onclick="window.open('https://github.com/thaddickson/Xpio-Website-AI-chatbot/blob/master/AB_TESTING_GUIDE.md', '_blank')">🔗 View on GitHub</button>
+      </div>
+
+      <div id="docsContainer" style="padding: 20px; background: white; border-radius: 8px; max-width: 900px;">
+        <div class="loading">Loading documentation...</div>
       </div>
     </div>
   </div>
@@ -465,6 +512,76 @@
       // Load data for the tab if needed
       if (tabName === 'stats') {
         loadStats();
+      } else if (tabName === 'docs') {
+        loadDocs();
+      }
+    }
+
+    // Load documentation
+    async function loadDocs() {
+      const container = document.getElementById('docsContainer');
+      container.innerHTML = '<div class="loading">Loading documentation...</div>';
+
+      try {
+        // Fetch the markdown from GitHub
+        const response = await fetch('https://raw.githubusercontent.com/thaddickson/Xpio-Website-AI-chatbot/master/AB_TESTING_GUIDE.md');
+        const markdown = await response.text();
+
+        // Convert markdown to HTML (simple version)
+        let html = markdown
+          // Headers
+          .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+          .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+          .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+          // Bold
+          .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+          // Code blocks
+          .replace(/```(\w+)?\n([\s\S]*?)```/gim, '<pre><code>$2</code></pre>')
+          // Inline code
+          .replace(/`([^`]+)`/gim, '<code>$1</code>')
+          // Links
+          .replace(/\[([^\]]+)\]\(([^)]+)\)/gim, '<a href="$2" target="_blank">$1</a>')
+          // Lists
+          .replace(/^\- (.*$)/gim, '<li>$1</li>')
+          .replace(/(<li>.*<\/li>)/gim, '<ul>$1</ul>')
+          // Tables (basic support)
+          .replace(/\|(.+)\|/gim, function(match, content) {
+            const cells = content.split('|').map(c => c.trim()).filter(c => c);
+            return '<tr>' + cells.map(c => '<td>' + c + '</td>').join('') + '</tr>';
+          })
+          // Paragraphs
+          .replace(/\n\n/gim, '</p><p>')
+          .replace(/^(.+)$/gim, '<p>$1</p>');
+
+        container.innerHTML = `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333;">
+            ${html}
+          </div>
+          <style>
+            #docsContainer h1 { font-size: 32px; margin: 30px 0 20px; color: #2B2B2B; }
+            #docsContainer h2 { font-size: 24px; margin: 25px 0 15px; color: #2B2B2B; border-bottom: 2px solid #FC922B; padding-bottom: 5px; }
+            #docsContainer h3 { font-size: 20px; margin: 20px 0 10px; color: #2B2B2B; }
+            #docsContainer p { margin: 10px 0; }
+            #docsContainer code { background: #f5f5f5; padding: 2px 6px; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 13px; }
+            #docsContainer pre { background: #2B2B2B; color: #fff; padding: 15px; border-radius: 5px; overflow-x: auto; margin: 15px 0; }
+            #docsContainer pre code { background: none; padding: 0; color: #fff; }
+            #docsContainer ul { margin: 10px 0 10px 20px; }
+            #docsContainer li { margin: 5px 0; }
+            #docsContainer table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+            #docsContainer td { border: 1px solid #ddd; padding: 10px; }
+            #docsContainer tr:first-child td { background: #f5f5f5; font-weight: 600; }
+            #docsContainer a { color: #0066FF; text-decoration: none; }
+            #docsContainer a:hover { text-decoration: underline; }
+          </style>
+        `;
+      } catch (error) {
+        container.innerHTML = `
+          <div class="error">Failed to load documentation.
+          <a href="https://github.com/thaddickson/Xpio-Website-AI-chatbot/blob/master/AB_TESTING_GUIDE.md" target="_blank">
+            View on GitHub instead
+          </a>
+          </div>
+        `;
       }
     }
 
