@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node test-email.js:*)",
+      "Bash(node test-slack.js:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "WebFetch(domain:www.myevolv.com)",
+      "WebFetch(domain:www.qualifacts.com)",
+      "WebFetch(domain:www.ntst.com)",
+      "WebFetch(domain:cantatahealth.com)",
+      "WebFetch(domain:xpiohealth.com)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "jira"
+  ]
+}

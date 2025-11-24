@@ -192,6 +192,66 @@ class Prompt {
       throw error;
     }
   }
+
+  /**
+   * Build system prompt with A/B test variations
+   * @param {string} conversationId - Conversation ID for tracking
+   * @returns {Object} { prompt: string, variationAssignments: Object }
+   */
+  static async buildSystemPromptWithVariations(conversationId) {
+    try {
+      const sections = await this.getAllActive();
+
+      if (sections.length === 0) {
+        console.warn('⚠️  No active prompt sections found, using fallback');
+        return {
+          prompt: 'You are a helpful assistant for Xpio Health.',
+          variationAssignments: {}
+        };
+      }
+
+      // Import PromptVariation model
+      const PromptVariation = (await import('./PromptVariation.js')).default;
+
+      const variationAssignments = {};
+      const promptParts = [];
+
+      // For each section, check if there are active variations
+      for (const section of sections) {
+        const selectedVariation = await PromptVariation.selectVariationForConversation(section.id);
+
+        if (selectedVariation) {
+          // Use variation content
+          promptParts.push(selectedVariation.content);
+          variationAssignments[section.id] = selectedVariation.id;
+
+          // Record the assignment
+          await PromptVariation.recordAssignment(conversationId, section.id, selectedVariation.id);
+
+          console.log(`🧪 Using variation "${selectedVariation.variation_name}" for section "${section.name}"`);
+        } else {
+          // Use base prompt content (control group)
+          promptParts.push(section.content);
+        }
+      }
+
+      const prompt = promptParts.join('\n\n---\n\n');
+
+      return {
+        prompt,
+        variationAssignments,
+        usedVariations: Object.keys(variationAssignments).length > 0
+      };
+    } catch (error) {
+      console.error('Error building system prompt with variations:', error);
+      // Fallback to regular prompt on error
+      return {
+        prompt: await this.buildSystemPrompt(),
+        variationAssignments: {},
+        usedVariations: false
+      };
+    }
+  }
 }
 
 export default Prompt;

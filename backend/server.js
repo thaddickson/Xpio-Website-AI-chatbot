@@ -23,6 +23,15 @@ import {
   importHardcodedPrompt
 } from './src/controllers/promptController.js';
 import {
+  getVariations,
+  createVariation,
+  updateVariation,
+  deleteVariation,
+  getPerformanceComparison,
+  promoteVariation,
+  quickRollback
+} from './src/controllers/variationController.js';
+import {
   handleSlackEvents,
   pollSlackMessages,
   sendToSlackThread
@@ -157,6 +166,15 @@ app.get('/api/admin/prompts', adminAuth, getAllPrompts);
 app.post('/api/admin/prompts', adminAuth, createPrompt);
 app.put('/api/admin/prompts/:id', adminAuth, updatePrompt);
 app.delete('/api/admin/prompts/:id', adminAuth, deletePrompt);
+
+// A/B testing and variation endpoints (protected)
+app.get('/api/admin/prompts/:promptId/variations/performance', adminAuth, getPerformanceComparison);
+app.get('/api/admin/prompts/:promptId/variations', adminAuth, getVariations);
+app.post('/api/admin/prompts/:promptId/variations', adminAuth, createVariation);
+app.post('/api/admin/prompts/:promptId/rollback', adminAuth, quickRollback);
+app.put('/api/admin/variations/:id', adminAuth, updateVariation);
+app.delete('/api/admin/variations/:id', adminAuth, deleteVariation);
+app.post('/api/admin/variations/:id/promote', adminAuth, promoteVariation);
 
 // 404 handler
 app.use((req, res) => {
