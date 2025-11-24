@@ -351,7 +351,7 @@
     <!-- Documentation Tab -->
     <div id="docs-tab" class="tab-content">
       <div class="actions">
-        <button onclick="window.open('https://github.com/thaddickson/Xpio-Website-AI-chatbot/blob/master/AB_TESTING_GUIDE.md', '_blank')">🔗 View on GitHub</button>
+        <button onclick="window.open('https://github.com/thaddickson/Xpio-Website-AI-chatbot/blob/master/PROMPT_TESTING_GUIDE.md', '_blank')">🔗 View on GitHub</button>
       </div>
 
       <div id="docsContainer" style="padding: 20px; background: white; border-radius: 8px; max-width: 900px;">
@@ -612,7 +612,7 @@
 
       try {
         // Fetch the markdown from GitHub
-        const response = await fetch('https://raw.githubusercontent.com/thaddickson/Xpio-Website-AI-chatbot/master/AB_TESTING_GUIDE.md');
+        const response = await fetch('https://raw.githubusercontent.com/thaddickson/Xpio-Website-AI-chatbot/master/PROMPT_TESTING_GUIDE.md');
         const markdown = await response.text();
 
         // Convert markdown to HTML (simple version)
@@ -999,7 +999,7 @@
 
       container.innerHTML = `
         <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
-          <strong>💡 How it works:</strong> Create variations of any prompt section, allocate traffic percentage, and track which performs better. <a href="#" onclick="switchTab('docs'); return false;">View Guide →</a>
+          <strong>💡 How it works:</strong> Create prompt variations, test them manually, use AI to improve based on what you find. Perfect for iterative prompt refinement! <a href="#" onclick="switchTab('docs'); return false;">View Complete Guide →</a>
         </div>
       ` + data.map(({ prompt, variations }) => {
         const totalTraffic = variations.filter(v => v.is_active).reduce((sum, v) => sum + v.traffic_percentage, 0);
