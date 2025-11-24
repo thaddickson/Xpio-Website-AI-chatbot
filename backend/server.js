@@ -32,6 +32,11 @@ import {
   quickRollback
 } from './src/controllers/variationController.js';
 import {
+  improvePrompt,
+  analyzePrompt,
+  generatePrompt
+} from './src/controllers/aiEditorController.js';
+import {
   handleSlackEvents,
   pollSlackMessages,
   sendToSlackThread
@@ -175,6 +180,11 @@ app.post('/api/admin/prompts/:promptId/rollback', adminAuth, quickRollback);
 app.put('/api/admin/variations/:id', adminAuth, updateVariation);
 app.delete('/api/admin/variations/:id', adminAuth, deleteVariation);
 app.post('/api/admin/variations/:id/promote', adminAuth, promoteVariation);
+
+// AI Prompt Editor endpoints (protected)
+app.post('/api/admin/ai-editor/improve', adminAuth, improvePrompt);
+app.post('/api/admin/ai-editor/analyze', adminAuth, analyzePrompt);
+app.post('/api/admin/ai-editor/generate', adminAuth, generatePrompt);
 
 // 404 handler
 app.use((req, res) => {

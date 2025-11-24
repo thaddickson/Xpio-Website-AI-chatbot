@@ -442,7 +442,12 @@
         </div>
 
         <div class="form-group">
-          <label for="variationContent">Content</label>
+          <label for="variationContent">
+            Content
+            <button type="button" onclick="openAIEditor()" style="float: right; padding: 4px 10px; font-size: 12px; background: #9C27B0; color: white; border: none; border-radius: 3px; cursor: pointer;">
+              🤖 AI Improve
+            </button>
+          </label>
           <textarea id="variationContent" required placeholder="Enter the variation content..." style="min-height: 200px;"></textarea>
         </div>
 
@@ -472,9 +477,64 @@
     </div>
   </div>
 
+  <!-- AI Editor Modal -->
+  <div id="aiEditorModal" class="modal">
+    <div class="modal-content" style="max-width: 1000px;">
+      <div class="modal-header">
+        <h2 class="modal-title">🤖 AI Prompt Editor</h2>
+        <button class="close-btn" onclick="closeAIEditor()">×</button>
+      </div>
+
+      <div style="padding: 20px;">
+        <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #9C27B0; border-radius: 4px;">
+          <strong>💡 How it works:</strong> Describe what's not working with your prompt, and AI will suggest improvements.
+        </div>
+
+        <div class="form-group">
+          <label for="aiFeedback">What's the problem? What do you want to improve?</label>
+          <textarea id="aiFeedback" placeholder="e.g., 'Responses are too long', 'Not using the calendar tool enough', 'Too formal, make it casual'" rows="3" style="width: 100%;"></textarea>
+        </div>
+
+        <div style="margin-bottom: 20px;">
+          <button onclick="getAIImprovement()" id="improveBtn">🚀 Get AI Suggestions</button>
+          <button onclick="quickAnalyze()" class="secondary" id="analyzeBtn" style="margin-left: 10px;">⚡ Quick Analysis</button>
+        </div>
+
+        <div id="aiResults" style="display: none;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+              <h3 style="margin: 0 0 10px 0; font-size: 16px;">Before (Current)</h3>
+              <div id="beforePrompt" style="background: #f9f9f9; padding: 15px; border-radius: 5px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; border: 1px solid #ddd;"></div>
+            </div>
+            <div>
+              <h3 style="margin: 0 0 10px 0; font-size: 16px;">After (Improved)</h3>
+              <div id="afterPrompt" style="background: #e8f5e9; padding: 15px; border-radius: 5px; max-height: 300px; overflow-y: auto; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; border: 1px solid #4CAF50;"></div>
+            </div>
+          </div>
+
+          <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border: 1px solid #ffc107;">
+            <h4 style="margin: 0 0 10px 0; font-size: 14px;">📝 Changes Made:</h4>
+            <div id="changesExplanation" style="white-space: pre-wrap; font-size: 13px;"></div>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button onclick="acceptAIImprovement()">✅ Accept & Use This</button>
+            <button onclick="iterateMore()" class="secondary">🔄 Iterate More</button>
+            <button onclick="closeAIEditor()" class="secondary">❌ Cancel</button>
+          </div>
+        </div>
+
+        <div id="aiLoading" style="display: none; text-align: center; padding: 40px;">
+          <div class="loading">AI is analyzing your prompt...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     let prompts = [];
+    let currentImprovedPrompt = '';
     let adminPassword = null;
 
     // Get admin password
@@ -999,14 +1059,15 @@
               </div>
             </div>
           </div>
-          <div style="display: flex; gap: 8px; margin-top: 10px;">
+          <div style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
             <button onclick="editVariation('${variation.id}', '${prompt.id}')" style="padding: 4px 10px; font-size: 12px;">✏️ Edit</button>
+            <button onclick="openAIEditorForVariation('${variation.id}', '${prompt.id}')" style="padding: 4px 10px; font-size: 12px; background: #9C27B0; color: white;">🤖 AI Improve</button>
             <button onclick="toggleVariationActive('${variation.id}', '${prompt.id}', ${!variation.is_active})" style="padding: 4px 10px; font-size: 12px;">
               ${variation.is_active ? '⏸️ Pause' : '▶️ Activate'}
             </button>
             <button onclick="viewPerformance('${variation.id}', '${prompt.id}')" style="padding: 4px 10px; font-size: 12px;">📊 Performance</button>
             ${variation.is_active ? `
-              <button onclick="promoteVariation('${variation.id}', '${prompt.id}', '${escapeHtml(variation.variation_name)}')" style="padding: 4px 10px; font-size: 12px; background: #4CAF50;">
+              <button onclick="promoteVariation('${variation.id}', '${prompt.id}', '${escapeHtml(variation.variation_name)}')" style="padding: 4px 10px; font-size: 12px; background: #4CAF50; color: white;">
                 🏆 Promote to Base
               </button>
             ` : ''}
@@ -1187,6 +1248,141 @@
 
     function closeVariationModal() {
       document.getElementById('variationModal').classList.remove('active');
+    }
+
+    // ========== AI PROMPT EDITOR ==========
+
+    function openAIEditor() {
+      const currentContent = document.getElementById('variationContent').value;
+
+      if (!currentContent.trim()) {
+        showError('Please enter some content first before using AI to improve it.');
+        return;
+      }
+
+      document.getElementById('aiEditorModal').classList.add('active');
+      document.getElementById('aiResults').style.display = 'none';
+      document.getElementById('aiFeedback').value = '';
+      document.getElementById('aiFeedback').focus();
+    }
+
+    async function openAIEditorForVariation(variationId, promptId) {
+      // First open the edit modal to load the variation
+      await editVariation(variationId, promptId);
+
+      // Then open the AI editor
+      setTimeout(() => {
+        openAIEditor();
+      }, 100);
+    }
+
+    function closeAIEditor() {
+      document.getElementById('aiEditorModal').classList.remove('active');
+    }
+
+    async function getAIImprovement() {
+      const currentContent = document.getElementById('variationContent').value;
+      const feedback = document.getElementById('aiFeedback').value.trim();
+
+      if (!feedback) {
+        showError('Please describe what you want to improve.');
+        return;
+      }
+
+      const improveBtn = document.getElementById('improveBtn');
+      const originalText = improveBtn.textContent;
+      improveBtn.disabled = true;
+      improveBtn.textContent = '⏳ Analyzing...';
+
+      document.getElementById('aiLoading').style.display = 'block';
+      document.getElementById('aiResults').style.display = 'none';
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/ai-editor/improve`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({
+            currentPrompt: currentContent,
+            feedback: feedback,
+            promptType: 'chatbot_system_prompt'
+          })
+        });
+
+        if (handleAuthError(response)) return;
+
+        const data = await response.json();
+
+        // Store the improved prompt
+        currentImprovedPrompt = data.improvedPrompt;
+
+        // Display results
+        document.getElementById('beforePrompt').textContent = currentContent;
+        document.getElementById('afterPrompt').textContent = data.improvedPrompt;
+        document.getElementById('changesExplanation').textContent = data.explanation;
+
+        document.getElementById('aiLoading').style.display = 'none';
+        document.getElementById('aiResults').style.display = 'block';
+
+      } catch (error) {
+        showError('Failed to get AI suggestions: ' + error.message);
+        document.getElementById('aiLoading').style.display = 'none';
+      } finally {
+        improveBtn.disabled = false;
+        improveBtn.textContent = originalText;
+      }
+    }
+
+    async function quickAnalyze() {
+      const currentContent = document.getElementById('variationContent').value;
+
+      if (!currentContent.trim()) {
+        showError('Please enter some content first.');
+        return;
+      }
+
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const originalText = analyzeBtn.textContent;
+      analyzeBtn.disabled = true;
+      analyzeBtn.textContent = '⏳ Analyzing...';
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/ai-editor/analyze`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ prompt: currentContent })
+        });
+
+        if (handleAuthError(response)) return;
+
+        const data = await response.json();
+
+        alert(`AI Analysis:\n\n${data.suggestions}\n\nUse the feedback box to request specific improvements.`);
+
+      } catch (error) {
+        showError('Failed to analyze prompt: ' + error.message);
+      } finally {
+        analyzeBtn.disabled = false;
+        analyzeBtn.textContent = originalText;
+      }
+    }
+
+    function acceptAIImprovement() {
+      // Update the variation content with the improved version
+      document.getElementById('variationContent').value = currentImprovedPrompt;
+      showSuccess('AI improvements applied! Review and save when ready.');
+      closeAIEditor();
+    }
+
+    function iterateMore() {
+      // Use the improved prompt as the new starting point
+      document.getElementById('variationContent').value = currentImprovedPrompt;
+
+      // Reset the AI editor for another round
+      document.getElementById('aiResults').style.display = 'none';
+      document.getElementById('aiFeedback').value = '';
+      document.getElementById('aiFeedback').focus();
+
+      showSuccess('Iteration applied! Describe the next improvement you want.');
     }
   </script>
 
