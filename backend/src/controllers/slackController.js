@@ -38,6 +38,28 @@ export async function handleSlackEvents(req, res) {
         const conversationId = await findConversationByThreadTs(event.thread_ts);
 
         if (conversationId) {
+          // Check for /handback command
+          if (event.text && event.text.trim().toLowerCase() === '/handback') {
+            console.log(`🔄 Handback command received for conversation: ${conversationId}`);
+
+            // Clear handoff state - let AI resume
+            await Conversation.clearHandoff(conversationId);
+
+            // Send confirmation to Slack thread using Slack client directly
+            const { WebClient } = await import('@slack/web-api');
+            const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+            await slackClient.chat.postMessage({
+              channel: process.env.SLACK_CHANNEL_ID,
+              thread_ts: event.thread_ts,
+              text: '✅ AI has resumed the conversation. The chatbot will handle the next visitor message.',
+              mrkdwn: true
+            });
+
+            console.log(`✓ AI resumed for conversation: ${conversationId}`);
+            return res.json({ ok: true });
+          }
+
           // Store the message for the visitor to poll
           if (!pendingMessages.has(conversationId)) {
             pendingMessages.set(conversationId, []);

@@ -242,6 +242,31 @@ class Conversation {
   }
 
   /**
+   * Clear handoff state - allow AI to resume conversation
+   * @param {string} conversationId - Unique conversation identifier
+   * @returns {boolean} Success status
+   */
+  static async clearHandoff(conversationId) {
+    try {
+      const { error } = await getSupabase()
+        .from('conversations')
+        .update({
+          is_handed_off: false,
+          handed_off_to: null
+          // Keep slack_thread_ts for history
+        })
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+      console.log(`🔄 Conversation ${conversationId} handoff cleared - AI resumed`);
+      return true;
+    } catch (error) {
+      console.error('Database error clearing handoff:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get conversation statistics
    * @returns {Object} Stats about conversations
    */
