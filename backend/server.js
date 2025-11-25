@@ -60,6 +60,7 @@ import {
   getIntegrations,
   updateIntegrations,
   listAllTenants,
+  updateTenant,
   getPlans,
   checkSlugAvailability
 } from './src/controllers/tenantController.js';
@@ -271,6 +272,9 @@ app.post('/api/admin/ai-editor/generate', adminAuth, generatePrompt);
 app.get('/api/admin/usage', adminAuth, getUsage);
 app.get('/api/admin/usage/anthropic', adminAuth, getAnthropicUsage);
 app.get('/api/platform/usage', adminAuth, getPlatformUsage);
+
+// Platform admin tenant management
+app.put('/api/platform/tenants/:id', adminAuth, updateTenant);
 
 // 404 handler
 app.use((req, res) => {

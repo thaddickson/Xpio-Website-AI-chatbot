@@ -695,11 +695,17 @@
         <div class="form-group">
           <label for="tenantPlan">Plan</label>
           <select id="tenantPlan" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
-            <option value="free">Free (100 conversations/month)</option>
-            <option value="starter">Starter (1,000 conversations/month)</option>
-            <option value="pro">Pro (10,000 conversations/month)</option>
-            <option value="enterprise">Enterprise (Unlimited)</option>
+            <option value="free">Free - $0/mo (100 conversations)</option>
+            <option value="starter">Starter - $50/mo (1,000 conversations)</option>
+            <option value="pro">Pro - $150/mo (10,000 conversations)</option>
+            <option value="enterprise">Enterprise - $250/mo (Unlimited)</option>
           </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tenantManualApiCost">Manual API Cost Override (USD)</label>
+          <input type="number" id="tenantManualApiCost" step="0.01" min="0" placeholder="e.g., 38.00">
+          <small style="color: #666;">Enter historical API costs not captured by tracking. Added to calculated usage.</small>
         </div>
 
         <div class="form-group">
@@ -1692,7 +1698,7 @@
       try {
         // Get all tenants and their usage
         const [tenantsRes, usageRes] = await Promise.all([
-          fetch(`${API_URL}/api/admin/tenants`, { headers: getAuthHeaders(false) }),
+          fetch(`${API_URL}/api/platform/tenants`, { headers: getAuthHeaders(false) }),
           fetch(`${API_URL}/api/platform/usage?period=${period}`, { headers: getAuthHeaders(false) })
         ]);
 
@@ -1713,8 +1719,10 @@
         const customers = (tenantsData.tenants || []).map(tenant => {
           const plan = PLAN_PRICING[tenant.plan_type] || PLAN_PRICING['starter'];
           const usage = usageByTenant[tenant.id] || { costUsd: 0, requests: 0 };
-          const apiCost = usage.costUsd || 0;
-          const billedApiCost = apiCost * plan.apiMarkup; // Apply markup
+          const trackedApiCost = usage.costUsd || 0;
+          const manualApiCost = tenant.manual_api_cost || 0;
+          const totalApiCost = trackedApiCost + manualApiCost; // Combined tracked + manual
+          const billedApiCost = totalApiCost * plan.apiMarkup; // Apply markup
           const totalDue = plan.baseFee + billedApiCost;
 
           return {
@@ -1724,7 +1732,9 @@
             plan: plan.name,
             planType: tenant.plan_type,
             baseFee: plan.baseFee,
-            apiCost: apiCost,
+            trackedApiCost: trackedApiCost,
+            manualApiCost: manualApiCost,
+            totalApiCost: totalApiCost,
             billedApiCost: billedApiCost,
             totalDue: totalDue,
             status: tenant.status,
@@ -1735,8 +1745,8 @@
         // Calculate totals
         const totals = customers.reduce((acc, c) => {
           acc.revenue += c.totalDue;
-          acc.apiCost += c.apiCost;
-          acc.profit += (c.totalDue - c.apiCost);
+          acc.apiCost += c.totalApiCost;
+          acc.profit += (c.totalDue - c.totalApiCost);
           if (c.status === 'active') acc.active++;
           return acc;
         }, { revenue: 0, apiCost: 0, profit: 0, active: 0 });
@@ -1778,7 +1788,11 @@
           </td>
           <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
             $${c.billedApiCost.toFixed(2)}
-            <div style="font-size: 11px; color: #999;">(${c.requests} requests)</div>
+            <div style="font-size: 11px; color: #999;">
+              ${c.requests > 0 ? `tracked: $${c.trackedApiCost.toFixed(2)}` : ''}
+              ${c.manualApiCost > 0 ? `${c.requests > 0 ? ' + ' : ''}manual: $${c.manualApiCost.toFixed(2)}` : ''}
+              ${c.requests === 0 && c.manualApiCost === 0 ? 'no usage' : ''}
+            </div>
           </td>
           <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">
             $${c.totalDue.toFixed(2)}
@@ -1926,6 +1940,7 @@
       document.getElementById('tenantPlan').value = tenant.plan_type;
       document.getElementById('tenantStatus').value = tenant.status;
       document.getElementById('tenantCustomDomain').value = tenant.custom_domain || '';
+      document.getElementById('tenantManualApiCost').value = tenant.manual_api_cost || '';
       document.getElementById('tenantModal').classList.add('active');
     }
 
@@ -1933,12 +1948,15 @@
       event.preventDefault();
 
       const id = document.getElementById('tenantId').value;
+      const manualApiCost = parseFloat(document.getElementById('tenantManualApiCost').value) || 0;
+
       const data = {
         name: document.getElementById('tenantName').value,
         slug: document.getElementById('tenantSlug').value,
         plan_type: document.getElementById('tenantPlan').value,
         status: document.getElementById('tenantStatus').value,
-        custom_domain: document.getElementById('tenantCustomDomain').value || null
+        custom_domain: document.getElementById('tenantCustomDomain').value || null,
+        manual_api_cost: manualApiCost
       };
 
       try {
@@ -2015,22 +2033,22 @@
 
         <div style="margin-top: 20px; display: flex; gap: 10px;">
           <button onclick="editTenant('${tenant.id}'); closeTenantDetailsModal();">✏️ Edit Tenant</button>
-          <button onclick="generateApiKey('${tenant.id}', '${escapeHtml(tenant.name)}')" class="secondary">🔑 Generate API Key</button>
+          <button onclick="generateWidgetKey('${tenant.id}', '${escapeHtml(tenant.name)}')" class="secondary">🔑 Widget Embed Key</button>
           <button onclick="closeTenantDetailsModal()" class="secondary">Close</button>
         </div>
       `;
     }
 
-    async function generateApiKey(tenantId, tenantName) {
-      if (!confirm(`Generate a new API key for "${tenantName}"?\n\nThis will create a publishable key they can use in their chat widget.`)) {
+    async function generateWidgetKey(tenantId, tenantName) {
+      if (!confirm(`Generate a Widget Embed Key for "${tenantName}"?\n\nThis key (like pk_live_acme_xxx) is used in the chat widget <script> tag to identify this customer. It is NOT the Anthropic API key.`)) {
         return;
       }
 
       try {
         // For now, show instructions since we need the tenant to be logged in to generate keys
-        alert(`To generate API keys for this tenant:\n\n1. Log in as the tenant at /login.html\n2. Go to /dashboard.html\n3. Navigate to "API Keys" section\n4. Click "Generate New Key"\n\nOr have the tenant do this themselves from their dashboard.`);
+        alert(`Widget Embed Keys identify the customer when the chat widget loads.\n\nTo generate one:\n1. Log in as the tenant at /login.html\n2. Go to /dashboard.html\n3. Navigate to "API Keys" section\n4. Click "Generate New Key"\n\nNote: The Anthropic API key is set in Railway environment variables and shared across all tenants (or each tenant can use their own).`);
       } catch (error) {
-        showError('Failed to generate API key: ' + error.message);
+        showError('Failed to generate widget key: ' + error.message);
       }
     }
 

@@ -569,6 +569,44 @@ export async function listAllTenants(req, res) {
 }
 
 /**
+ * Update tenant (platform admin only)
+ * PUT /api/platform/tenants/:id
+ */
+export async function updateTenant(req, res) {
+  try {
+    const { id } = req.params;
+    const { name, slug, plan_type, status, custom_domain, manual_api_cost } = req.body;
+
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (slug !== undefined) updates.slug = slug;
+    if (plan_type !== undefined) updates.plan_type = plan_type;
+    if (status !== undefined) updates.status = status;
+    if (custom_domain !== undefined) updates.custom_domain = custom_domain;
+    if (manual_api_cost !== undefined) updates.manual_api_cost = manual_api_cost;
+
+    const tenant = await Tenant.update(id, updates);
+
+    if (!tenant) {
+      return res.status(404).json({
+        error: 'Tenant not found'
+      });
+    }
+
+    res.json({
+      tenant,
+      message: 'Tenant updated successfully'
+    });
+  } catch (error) {
+    console.error('Update tenant error:', error);
+    res.status(500).json({
+      error: 'Failed to update tenant',
+      message: error.message
+    });
+  }
+}
+
+/**
  * Get available plans
  * GET /api/plans
  */
@@ -628,6 +666,7 @@ export default {
   getIntegrations,
   updateIntegrations,
   listAllTenants,
+  updateTenant,
   getPlans,
   checkSlugAvailability
 };
