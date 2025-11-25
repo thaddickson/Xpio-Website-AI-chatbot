@@ -3,7 +3,7 @@ import { DEFAULT_TENANT_ID } from './Tenant.js';
 
 // Lazy initialize Supabase client
 let supabase = null;
-function getSupabase() {
+export function getSupabase() {
   if (!supabase) {
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_KEY) {
       throw new Error('SUPABASE_URL and SUPABASE_KEY must be set in environment variables');
