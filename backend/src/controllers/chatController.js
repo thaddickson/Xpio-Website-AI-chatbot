@@ -25,7 +25,7 @@ function getAnthropic() {
 
 // Model fallback chain (Anthropic only)
 const MODEL_CHAIN = [
-  'claude-opus-4-5-20250514',    // Opus 4.5 - primary
+  'claude-opus-4-5-20251101',    // Opus 4.5 - primary
   'claude-sonnet-4-5-20250514',  // Sonnet 4.5 - fallback 1
   'claude-3-5-haiku-20241022'    // Haiku 3.5 - fallback 2
 ];
