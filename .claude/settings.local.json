@@ -10,7 +10,10 @@
       "WebFetch(domain:www.qualifacts.com)",
       "WebFetch(domain:www.ntst.com)",
       "WebFetch(domain:cantatahealth.com)",
-      "WebFetch(domain:xpiohealth.com)"
+      "WebFetch(domain:xpiohealth.com)",
+      "Bash(findstr:*)",
+      "Bash(cd:*)",
+      "Bash(sed:*)"
     ],
     "deny": [],
     "ask": []

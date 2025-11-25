@@ -328,33 +328,61 @@
 
         .xpio-typing-indicator {
           display: flex;
-          gap: 4px;
-          padding: 12px;
-          background: white;
-          border-radius: 8px;
-          max-width: 60px;
-          box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+          align-items: center;
+          gap: 8px;
+          padding: 12px 16px;
+          background: ${this.config.aiBubbleColor};
+          color: white;
+          border-radius: 18px;
+          border-bottom-left-radius: 4px;
+          max-width: fit-content;
+          box-shadow: 0 2px 8px rgba(43, 43, 43, 0.25);
+          font-size: 14px;
+          position: relative;
+          animation: xpio-message-in 0.3s ease;
         }
 
-        .xpio-typing-indicator span {
-          width: 8px;
-          height: 8px;
-          background: #999;
+        .xpio-typing-indicator::before {
+          content: '';
+          position: absolute;
+          left: -32px;
+          top: 0;
+          width: 24px;
+          height: 24px;
+          background-image: url('https://xpiohealth.com/wp-content/uploads/2022/04/Xpio-Health-Web-Logo.png');
+          background-size: contain;
+          background-repeat: no-repeat;
+          background-position: center;
+        }
+
+        .xpio-typing-text {
+          font-weight: 500;
+        }
+
+        .xpio-typing-dots {
+          display: flex;
+          gap: 3px;
+        }
+
+        .xpio-typing-dots span {
+          width: 6px;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.7);
           border-radius: 50%;
           animation: xpio-typing 1.4s infinite;
         }
 
-        .xpio-typing-indicator span:nth-child(2) {
+        .xpio-typing-dots span:nth-child(2) {
           animation-delay: 0.2s;
         }
 
-        .xpio-typing-indicator span:nth-child(3) {
+        .xpio-typing-dots span:nth-child(3) {
           animation-delay: 0.4s;
         }
 
         @keyframes xpio-typing {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-10px); }
+          0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+          30% { transform: translateY(-4px); opacity: 1; }
         }
 
         .xpio-quick-actions {
@@ -771,7 +799,7 @@
       const typingDiv = document.createElement('div');
       typingDiv.className = 'xpio-typing-indicator';
       typingDiv.id = 'xpio-typing';
-      typingDiv.innerHTML = '<span></span><span></span><span></span>';
+      typingDiv.innerHTML = '<span class="xpio-typing-text">Thinking</span><span class="xpio-typing-dots"><span></span><span></span><span></span></span>';
 
       messagesContainer.appendChild(typingDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
