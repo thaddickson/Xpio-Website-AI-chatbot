@@ -201,12 +201,15 @@ class Tenant {
         .select('*')
         .eq('custom_domain', domain.toLowerCase())
         .eq('domain_verified', true)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to avoid error on 0 rows
 
       if (error) throw error;
-      return data;
+      return data; // Returns null if no match, which is fine
     } catch (error) {
-      console.error('Database error fetching tenant by domain:', error);
+      // Only log actual errors, not "not found"
+      if (error.code !== 'PGRST116') {
+        console.error('Database error fetching tenant by domain:', error);
+      }
       return null;
     }
   }
