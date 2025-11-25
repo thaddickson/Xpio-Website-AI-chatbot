@@ -433,39 +433,57 @@
       </div>
     </div>
 
-    <!-- API Usage Tab -->
+    <!-- API Usage & Billing Tab -->
     <div id="usage-tab" class="tab-content">
       <div class="actions">
-        <button onclick="loadUsage()">🔄 Refresh</button>
-        <select id="usagePeriod" onchange="loadUsage()" style="padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-left: 10px;">
-          <option value="day">Today</option>
-          <option value="week">Last 7 Days</option>
+        <button onclick="loadBilling()">🔄 Refresh</button>
+        <select id="billingPeriod" onchange="loadBilling()" style="padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-left: 10px;">
           <option value="month" selected>This Month</option>
+          <option value="week">Last 7 Days</option>
           <option value="all">All Time</option>
         </select>
       </div>
 
-      <div class="stats-grid" id="usageStatsGrid" style="margin-bottom: 20px;">
+      <!-- Platform Totals -->
+      <div class="stats-grid" id="billingStatsGrid" style="margin-bottom: 20px;">
         <div class="stat-card">
-          <div class="stat-value" id="totalCostUsd">$0.00</div>
-          <div class="stat-label">Total Cost (USD)</div>
+          <div class="stat-value" id="totalRevenue">$0.00</div>
+          <div class="stat-label">Total Revenue (Base + API)</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" id="totalRequests">0</div>
-          <div class="stat-label">API Requests</div>
+          <div class="stat-value" id="totalApiCost">$0.00</div>
+          <div class="stat-label">Platform API Cost</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" id="totalInputTokens">0</div>
-          <div class="stat-label">Input Tokens</div>
+          <div class="stat-value" id="totalProfit">$0.00</div>
+          <div class="stat-label">Gross Profit</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" id="totalOutputTokens">0</div>
-          <div class="stat-label">Output Tokens</div>
+          <div class="stat-value" id="activeCustomers">0</div>
+          <div class="stat-label">Active Customers</div>
         </div>
       </div>
 
-      <div id="usageContainer" class="loading">
-        Loading usage data...
+      <!-- Customer Billing Table -->
+      <div id="billingContainer">
+        <div class="section-card">
+          <h3 style="margin-bottom: 15px;">Customer Billing Summary</h3>
+          <table style="width: 100%; border-collapse: collapse;" id="customerBillingTable">
+            <thead>
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 12px; text-align: left; border-bottom: 2px solid #ddd;">Customer</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">Plan</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Base Fee</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">API Usage</th>
+                <th style="padding: 12px; text-align: right; border-bottom: 2px solid #ddd;">Total Due</th>
+                <th style="padding: 12px; text-align: center; border-bottom: 2px solid #ddd;">Status</th>
+              </tr>
+            </thead>
+            <tbody id="customerBillingBody">
+              <!-- Filled by JS -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -868,7 +886,7 @@
       } else if (tabName === 'tenants') {
         loadTenants();
       } else if (tabName === 'usage') {
-        loadUsage();
+        loadBilling();
       }
     }
 
@@ -1655,116 +1673,141 @@
       showSuccess('Iteration applied! Describe the next improvement you want.');
     }
 
-    // ========== API USAGE TRACKING ==========
+    // ========== BILLING & USAGE TRACKING ==========
 
-    async function loadUsage() {
-      const container = document.getElementById('usageContainer');
-      container.innerHTML = '<div class="loading">Loading usage data...</div>';
+    // Plan pricing tiers
+    const PLAN_PRICING = {
+      'free': { name: 'Free', baseFee: 0, apiMarkup: 1.0 },
+      'starter': { name: 'Starter', baseFee: 50, apiMarkup: 1.5 },
+      'pro': { name: 'Pro', baseFee: 150, apiMarkup: 1.3 },
+      'enterprise': { name: 'Enterprise', baseFee: 250, apiMarkup: 1.2 }
+    };
 
-      const period = document.getElementById('usagePeriod').value;
+    async function loadBilling() {
+      const tbody = document.getElementById('customerBillingBody');
+      tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center;">Loading billing data...</td></tr>';
+
+      const period = document.getElementById('billingPeriod').value;
 
       try {
-        const response = await fetch(`${API_URL}/api/admin/usage?period=${period}`, {
-          headers: getAuthHeaders(false)
-        });
+        // Get all tenants and their usage
+        const [tenantsRes, usageRes] = await Promise.all([
+          fetch(`${API_URL}/api/admin/tenants`, { headers: getAuthHeaders(false) }),
+          fetch(`${API_URL}/api/platform/usage?period=${period}`, { headers: getAuthHeaders(false) })
+        ]);
 
-        if (handleAuthError(response)) return;
+        if (handleAuthError(tenantsRes) || handleAuthError(usageRes)) return;
 
-        if (!response.ok) {
-          throw new Error('Failed to load usage data');
+        const tenantsData = await tenantsRes.json();
+        const usageData = await usageRes.json();
+
+        // Build usage lookup by tenant ID
+        const usageByTenant = {};
+        if (usageData.tenants) {
+          usageData.tenants.forEach(t => {
+            usageByTenant[t.tenantId] = t;
+          });
         }
 
-        const usage = await response.json();
-        renderUsage(usage);
+        // Build billing rows
+        const customers = (tenantsData.tenants || []).map(tenant => {
+          const plan = PLAN_PRICING[tenant.plan_type] || PLAN_PRICING['starter'];
+          const usage = usageByTenant[tenant.id] || { costUsd: 0, requests: 0 };
+          const apiCost = usage.costUsd || 0;
+          const billedApiCost = apiCost * plan.apiMarkup; // Apply markup
+          const totalDue = plan.baseFee + billedApiCost;
+
+          return {
+            id: tenant.id,
+            name: tenant.name,
+            slug: tenant.slug,
+            plan: plan.name,
+            planType: tenant.plan_type,
+            baseFee: plan.baseFee,
+            apiCost: apiCost,
+            billedApiCost: billedApiCost,
+            totalDue: totalDue,
+            status: tenant.status,
+            requests: usage.requests || 0
+          };
+        });
+
+        // Calculate totals
+        const totals = customers.reduce((acc, c) => {
+          acc.revenue += c.totalDue;
+          acc.apiCost += c.apiCost;
+          acc.profit += (c.totalDue - c.apiCost);
+          if (c.status === 'active') acc.active++;
+          return acc;
+        }, { revenue: 0, apiCost: 0, profit: 0, active: 0 });
+
+        // Update stat cards
+        document.getElementById('totalRevenue').textContent = '$' + totals.revenue.toFixed(2);
+        document.getElementById('totalApiCost').textContent = '$' + totals.apiCost.toFixed(2);
+        document.getElementById('totalProfit').textContent = '$' + totals.profit.toFixed(2);
+        document.getElementById('activeCustomers').textContent = totals.active;
+
+        // Render table
+        renderBillingTable(customers);
+
       } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load usage data: ${error.message}<br><br>Make sure the api_usage table exists. Run migration 004_api_usage_tracking.sql in Supabase.</div>`;
+        console.error('Error loading billing:', error);
+        tbody.innerHTML = `<tr><td colspan="6" style="padding: 20px; text-align: center; color: red;">Failed to load billing data: ${error.message}</td></tr>`;
       }
     }
 
-    function renderUsage(usage) {
-      // Update stat cards
-      document.getElementById('totalCostUsd').textContent = '$' + (usage.totalCostUsd || 0).toFixed(4);
-      document.getElementById('totalRequests').textContent = formatNumber(usage.totalRequests || 0);
-      document.getElementById('totalInputTokens').textContent = formatNumber(usage.totalInputTokens || 0);
-      document.getElementById('totalOutputTokens').textContent = formatNumber(usage.totalOutputTokens || 0);
+    function renderBillingTable(customers) {
+      const tbody = document.getElementById('customerBillingBody');
 
-      const container = document.getElementById('usageContainer');
+      if (customers.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="padding: 20px; text-align: center;">No customers yet</td></tr>';
+        return;
+      }
 
-      // Build usage breakdown
-      let byModelHtml = '';
-      if (usage.byModel && Object.keys(usage.byModel).length > 0) {
-        byModelHtml = `
-          <div class="section-card" style="margin-bottom: 20px;">
-            <h3 style="margin-bottom: 15px;">Usage by Model</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr style="background: #f5f5f5;">
-                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Model</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Requests</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Input Tokens</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Output Tokens</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Cost</th>
-              </tr>
-              ${Object.entries(usage.byModel).map(([model, data]) => `
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${escapeHtml(model)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.requests)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.inputTokens)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.outputTokens)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">$${data.costUsd.toFixed(4)}</td>
-                </tr>
-              `).join('')}
+      tbody.innerHTML = customers.map(c => `
+        <tr>
+          <td style="padding: 12px; border-bottom: 1px solid #eee;">
+            <strong>${escapeHtml(c.name)}</strong>
+            <div style="font-size: 12px; color: #666;">${escapeHtml(c.slug)}</div>
+          </td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+            <span class="badge ${c.planType}">${c.plan}</span>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
+            $${c.baseFee.toFixed(2)}
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee;">
+            $${c.billedApiCost.toFixed(2)}
+            <div style="font-size: 11px; color: #999;">(${c.requests} requests)</div>
+          </td>
+          <td style="padding: 12px; text-align: right; border-bottom: 1px solid #eee; font-weight: bold;">
+            $${c.totalDue.toFixed(2)}
+          </td>
+          <td style="padding: 12px; text-align: center; border-bottom: 1px solid #eee;">
+            <span class="badge ${c.status}">${c.status}</span>
+          </td>
+        </tr>
+      `).join('');
+
+      // Add note about historical data
+      const container = document.getElementById('billingContainer');
+      if (!document.getElementById('billingNote')) {
+        container.insertAdjacentHTML('beforeend', `
+          <div id="billingNote" style="margin-top: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <strong>Note:</strong> API usage tracking started on Nov 25, 2024. Historical usage before this date is not included.
+            For accurate billing, you can manually enter historical API costs in Anthropic console or tenant settings.
+          </div>
+          <div style="margin-top: 15px; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <h4 style="margin: 0 0 10px 0;">Plan Pricing</h4>
+            <table style="width: 100%; font-size: 13px;">
+              <tr><td><strong>Free:</strong></td><td>$0/mo base</td><td>API at cost</td></tr>
+              <tr><td><strong>Starter:</strong></td><td>$50/mo base</td><td>API + 50% markup</td></tr>
+              <tr><td><strong>Pro:</strong></td><td>$150/mo base</td><td>API + 30% markup</td></tr>
+              <tr><td><strong>Enterprise:</strong></td><td>$250/mo base</td><td>API + 20% markup</td></tr>
             </table>
           </div>
-        `;
+        `);
       }
-
-      // Build daily breakdown
-      let byDayHtml = '';
-      if (usage.byDay && Object.keys(usage.byDay).length > 0) {
-        const sortedDays = Object.entries(usage.byDay).sort((a, b) => b[0].localeCompare(a[0]));
-        byDayHtml = `
-          <div class="section-card">
-            <h3 style="margin-bottom: 15px;">Daily Usage</h3>
-            <table style="width: 100%; border-collapse: collapse;">
-              <tr style="background: #f5f5f5;">
-                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Date</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Requests</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Tokens</th>
-                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Cost</th>
-              </tr>
-              ${sortedDays.map(([day, data]) => `
-                <tr>
-                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${day}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.requests)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.tokens)}</td>
-                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">$${data.costUsd.toFixed(4)}</td>
-                </tr>
-              `).join('')}
-            </table>
-          </div>
-        `;
-      }
-
-      // Show info about cache savings
-      const cacheTokens = (usage.totalCacheCreationTokens || 0) + (usage.totalCacheReadTokens || 0);
-      let cacheInfo = '';
-      if (cacheTokens > 0) {
-        cacheInfo = `
-          <div style="margin-bottom: 20px; padding: 15px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 4px;">
-            <strong>💡 Cache Usage:</strong> ${formatNumber(usage.totalCacheReadTokens || 0)} tokens read from cache (saving money!) • ${formatNumber(usage.totalCacheCreationTokens || 0)} tokens written to cache
-          </div>
-        `;
-      }
-
-      container.innerHTML = `
-        <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
-          <strong>📊 Period:</strong> ${usage.period} • Started: ${new Date(usage.startDate).toLocaleDateString()}
-        </div>
-        ${cacheInfo}
-        ${byModelHtml}
-        ${byDayHtml}
-        ${!byModelHtml && !byDayHtml ? '<div class="loading">No usage data yet. Start some conversations to see API usage!</div>' : ''}
-      `;
     }
 
     function formatNumber(num) {
