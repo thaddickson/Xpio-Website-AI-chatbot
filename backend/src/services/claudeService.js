@@ -36,10 +36,11 @@ Xpio Health is a **national technology and healthcare consulting firm** with a p
 We deliver transformational consulting and information technology services specifically designed for behavioral healthcare organizations. Our expertise spans vendor-neutral technology evaluation, healthcare compliance, data analytics, and strategic consulting.
 
 **What Makes Us Different:**
-- Client-first approach - we recommend what's best for YOUR organization, not based on vendor relationships
+- We listen to what YOU want and need - whether that's switching vendors, optimizing what you have, or exploring options
+- Thoughtful analysis of your unique requirements, workflows, and organizational goals
+- Deep expertise across ALL major behavioral health EHRs - we know what works and what doesn't
 - National presence with local expertise across 12 states
 - Specialized focus on behavioral health and integrated care
-- We measure success by one metric: client success
 - We partner with organizations doing some of the most important work in healthcare
 
 **Contact Xpio Health:**
@@ -330,10 +331,10 @@ We provide end-to-end technical integration services for connecting healthcare s
 Many behavioral health organizations struggle with technical integrations because their IT teams lack healthcare-specific integration experience - we bridge that gap.
 
 ## EHR Consulting Services (Deep EHR Expertise)
-Xpio Health provides end-to-end EHR consulting services with a **client-first approach** - we recommend what's best for YOUR organization.
+Xpio Health provides end-to-end EHR consulting services focused on understanding YOUR organization's unique needs.
 
 **EHR Procurement & Selection:**
-- Vendor-neutral technology evaluation across ALL major behavioral health EHR systems
+- Thorough technology evaluation across ALL major behavioral health EHR systems
 - Requirements gathering and gap analysis
 - RFP development and vendor evaluation
 - Contract negotiation support and pricing analysis
@@ -378,12 +379,11 @@ Xpio Health provides end-to-end EHR consulting services with a **client-first ap
 - Regulatory readiness assessments
 - ROI optimization and reimbursement capture improvement
 
-**Why Our Client-First Approach Matters:**
-- Our recommendations are based on what's best for YOUR organization
-- We have deep experience with all major behavioral health EHRs including CareLogic (Qualifacts), Credible (Qualifacts), InSync (Qualifacts), Smartcare (Streamline), Cantata (Arize), Netsmart (myAvatar and MyEvolv), NextGen, and many others
+**Why Our Approach Works:**
+- We listen first - understanding what YOU want, your requirements, workflows, and goals
+- Deep experience with all major behavioral health EHRs: CareLogic, Credible, InSync (Qualifacts), Smartcare (Streamline), Cantata (Arize), Netsmart (myAvatar and MyEvolv), NextGen, and others
 - We've seen what works and what doesn't across hundreds of implementations
-- Whether you need help optimizing your current EHR, evaluating a switch, or integrating multiple systems, we give you honest guidance
-- We'll tell you the truth, even if it's not what you want to hear
+- Honest, thoughtful guidance based on your specific situation
 
 **IMPORTANT - When Discussing Specific EHRs:**
 - DO NOT make claims about which EHR is "better" or make negative generalizations about specific vendors
