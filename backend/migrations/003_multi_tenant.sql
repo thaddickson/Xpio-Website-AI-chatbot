@@ -150,10 +150,9 @@ CREATE TABLE IF NOT EXISTS tenant_integrations (
 );
 
 -- =====================================================
--- PHASE 2: Add tenant_id to existing tables
+-- PHASE 2: Create default tenant for existing data
 -- =====================================================
 
--- Create a default tenant for existing data
 INSERT INTO tenants (id, name, slug, plan_type, status, settings)
 VALUES (
   '00000000-0000-0000-0000-000000000001',
@@ -183,6 +182,10 @@ VALUES (
   }'::jsonb
 ) ON CONFLICT (slug) DO NOTHING;
 
+-- =====================================================
+-- PHASE 3: Add tenant_id to existing tables
+-- =====================================================
+
 -- Add tenant_id to prompt_sections
 ALTER TABLE prompt_sections
   ADD COLUMN IF NOT EXISTS tenant_id UUID REFERENCES tenants(id) ON DELETE CASCADE;
@@ -192,7 +195,8 @@ SET tenant_id = '00000000-0000-0000-0000-000000000001'
 WHERE tenant_id IS NULL;
 
 -- Make slug unique per tenant, not globally
-DROP INDEX IF EXISTS prompt_sections_slug_key;
+-- Drop the constraint first (which will drop its underlying index)
+ALTER TABLE prompt_sections DROP CONSTRAINT IF EXISTS prompt_sections_slug_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_sections_tenant_slug
   ON prompt_sections(tenant_id, slug);
 
@@ -245,7 +249,7 @@ SET tenant_id = '00000000-0000-0000-0000-000000000001'
 WHERE tenant_id IS NULL;
 
 -- =====================================================
--- PHASE 3: Indexes for tenant queries
+-- PHASE 4: Indexes for tenant queries
 -- =====================================================
 
 CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
@@ -270,7 +274,7 @@ CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_conversations_tenant_created ON conversations(tenant_id, created_at DESC);
 
 -- =====================================================
--- PHASE 4: Row Level Security (RLS) Policies
+-- PHASE 5: Row Level Security (RLS) Policies
 -- =====================================================
 
 -- Enable RLS on tenant-scoped tables
@@ -334,7 +338,7 @@ CREATE POLICY tenant_isolation_metrics ON variation_performance_metrics
   USING (tenant_id = current_tenant_id() OR current_tenant_id() IS NULL);
 
 -- =====================================================
--- PHASE 5: Helper Functions
+-- PHASE 6: Helper Functions
 -- =====================================================
 
 -- Function to set tenant context
@@ -434,7 +438,7 @@ END;
 $$;
 
 -- =====================================================
--- PHASE 6: Auto-update triggers for tenants
+-- PHASE 7: Auto-update triggers for tenants
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION update_tenants_updated_at()
@@ -466,7 +470,7 @@ CREATE TRIGGER tenant_integrations_updated_at_trigger
   EXECUTE FUNCTION update_tenants_updated_at();
 
 -- =====================================================
--- PHASE 7: Monthly usage reset job (run via cron)
+-- PHASE 8: Monthly usage reset job (run via cron)
 -- =====================================================
 
 CREATE OR REPLACE FUNCTION reset_monthly_tenant_usage()

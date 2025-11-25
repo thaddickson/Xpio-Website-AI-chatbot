@@ -364,6 +364,7 @@
       <button class="tab active" onclick="switchTab('prompts')">📝 Prompts</button>
       <button class="tab" onclick="switchTab('stats')">📊 Statistics</button>
       <button class="tab" onclick="switchTab('testing')">🧪 A/B Testing</button>
+      <button class="tab" onclick="switchTab('tenants')">🏢 Tenants</button>
       <button class="tab" onclick="switchTab('docs')">📖 Docs</button>
     </div>
 
@@ -401,6 +402,33 @@
 
       <div id="variationsContainer" class="loading">
         Loading A/B testing data...
+      </div>
+    </div>
+
+    <!-- Tenants Tab -->
+    <div id="tenants-tab" class="tab-content">
+      <div class="actions">
+        <button onclick="loadTenants()">🔄 Refresh</button>
+        <button onclick="showCreateTenantModal()">➕ Add Tenant</button>
+      </div>
+
+      <div class="stats-grid" id="tenantStatsGrid" style="margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="stat-value" id="totalTenantsCount">-</div>
+          <div class="stat-label">Total Tenants</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="activeTenantsCount">-</div>
+          <div class="stat-label">Active Tenants</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalConversationsCount">-</div>
+          <div class="stat-label">Total Conversations</div>
+        </div>
+      </div>
+
+      <div id="tenantsContainer" class="loading">
+        Loading tenants...
       </div>
     </div>
 
@@ -587,6 +615,72 @@
     </div>
   </div>
 
+  <!-- Tenant Modal -->
+  <div id="tenantModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="tenantModalTitle">Create Tenant</h2>
+        <button class="close-btn" onclick="closeTenantModal()">×</button>
+      </div>
+
+      <form id="tenantForm" onsubmit="saveTenant(event)">
+        <input type="hidden" id="tenantId">
+
+        <div class="form-group">
+          <label for="tenantName">Company Name</label>
+          <input type="text" id="tenantName" required placeholder="e.g., Acme Health">
+        </div>
+
+        <div class="form-group">
+          <label for="tenantSlug">Slug (URL identifier)</label>
+          <input type="text" id="tenantSlug" required placeholder="e.g., acme-health" pattern="[a-z0-9-]+">
+          <small style="color: #666;">Lowercase letters, numbers, and hyphens only</small>
+        </div>
+
+        <div class="form-group">
+          <label for="tenantPlan">Plan</label>
+          <select id="tenantPlan" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <option value="free">Free (100 conversations/month)</option>
+            <option value="starter">Starter (1,000 conversations/month)</option>
+            <option value="pro">Pro (10,000 conversations/month)</option>
+            <option value="enterprise">Enterprise (Unlimited)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tenantStatus">Status</label>
+          <select id="tenantStatus" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 5px;">
+            <option value="active">Active</option>
+            <option value="trial">Trial</option>
+            <option value="suspended">Suspended</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tenantCustomDomain">Custom Domain (optional)</label>
+          <input type="text" id="tenantCustomDomain" placeholder="e.g., chat.acmehealth.com">
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+          <button type="submit">💾 Save Tenant</button>
+          <button type="button" class="secondary" onclick="closeTenantModal()">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Tenant Details Modal -->
+  <div id="tenantDetailsModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="tenantDetailsTitle">Tenant Details</h2>
+        <button class="close-btn" onclick="closeTenantDetailsModal()">×</button>
+      </div>
+      <div id="tenantDetailsContent">Loading...</div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     let prompts = [];
@@ -594,6 +688,7 @@
     let adminPassword = null;
     let tenantData = null;
     let authMode = 'password'; // 'password' or 'jwt'
+    let allTenants = [];
 
     // Initialize tenant context
     async function initializeTenantContext() {
@@ -733,6 +828,8 @@
         loadDocs();
       } else if (tabName === 'testing') {
         loadVariations();
+      } else if (tabName === 'tenants') {
+        loadTenants();
       }
     }
 
@@ -1517,6 +1614,229 @@
       document.getElementById('aiFeedback').focus();
 
       showSuccess('Iteration applied! Describe the next improvement you want.');
+    }
+
+    // ========== TENANT MANAGEMENT ==========
+
+    async function loadTenants() {
+      const container = document.getElementById('tenantsContainer');
+      container.innerHTML = '<div class="loading">Loading tenants...</div>';
+
+      try {
+        const response = await fetch(`${API_URL}/api/platform/tenants`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) {
+          throw new Error('Failed to load tenants. Make sure you have platform admin access.');
+        }
+
+        const data = await response.json();
+        allTenants = data.tenants || [];
+
+        // Update stats
+        document.getElementById('totalTenantsCount').textContent = allTenants.length;
+        document.getElementById('activeTenantsCount').textContent = allTenants.filter(t => t.status === 'active').length;
+        document.getElementById('totalConversationsCount').textContent = allTenants.reduce((sum, t) => sum + (t.current_month_conversations || 0), 0);
+
+        renderTenants(allTenants);
+      } catch (error) {
+        container.innerHTML = `<div class="error">Failed to load tenants: ${error.message}</div>`;
+      }
+    }
+
+    function renderTenants(tenants) {
+      const container = document.getElementById('tenantsContainer');
+
+      if (tenants.length === 0) {
+        container.innerHTML = '<div class="loading">No tenants found. Click "Add Tenant" to create one.</div>';
+        return;
+      }
+
+      container.className = 'sections-grid';
+      container.innerHTML = tenants.map(tenant => {
+        const statusColors = {
+          active: '#4CAF50',
+          trial: '#FF9800',
+          suspended: '#f44336',
+          cancelled: '#999'
+        };
+        const statusColor = statusColors[tenant.status] || '#999';
+
+        const planLabels = {
+          free: 'Free',
+          starter: 'Starter',
+          pro: 'Pro',
+          enterprise: 'Enterprise'
+        };
+
+        return `
+          <div class="section-card">
+            <div class="section-header">
+              <div>
+                <div class="section-title">${escapeHtml(tenant.name)}</div>
+                <div class="section-meta">
+                  <span class="toggle" style="background: ${statusColor}; color: white;">
+                    ${tenant.status}
+                  </span>
+                  <span class="toggle" style="background: #0066FF; color: white; margin-left: 5px;">
+                    ${planLabels[tenant.plan_type] || tenant.plan_type}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="section-meta" style="margin-top: 10px;">
+              <strong>Slug:</strong> ${escapeHtml(tenant.slug)}<br>
+              ${tenant.custom_domain ? `<strong>Domain:</strong> ${escapeHtml(tenant.custom_domain)}<br>` : ''}
+              <strong>Conversations this month:</strong> ${tenant.current_month_conversations || 0}<br>
+              <strong>Created:</strong> ${new Date(tenant.created_at).toLocaleDateString()}
+            </div>
+
+            <div class="section-actions" style="margin-top: 15px;">
+              <button onclick="viewTenantDetails('${tenant.id}')">👁️ View</button>
+              <button onclick="editTenant('${tenant.id}')">✏️ Edit</button>
+              <button onclick="generateApiKey('${tenant.id}', '${escapeHtml(tenant.name)}')" class="secondary">🔑 API Key</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function showCreateTenantModal() {
+      document.getElementById('tenantModalTitle').textContent = 'Create New Tenant';
+      document.getElementById('tenantForm').reset();
+      document.getElementById('tenantId').value = '';
+      document.getElementById('tenantModal').classList.add('active');
+    }
+
+    function editTenant(id) {
+      const tenant = allTenants.find(t => t.id === id);
+      if (!tenant) return;
+
+      document.getElementById('tenantModalTitle').textContent = 'Edit Tenant';
+      document.getElementById('tenantId').value = tenant.id;
+      document.getElementById('tenantName').value = tenant.name;
+      document.getElementById('tenantSlug').value = tenant.slug;
+      document.getElementById('tenantPlan').value = tenant.plan_type;
+      document.getElementById('tenantStatus').value = tenant.status;
+      document.getElementById('tenantCustomDomain').value = tenant.custom_domain || '';
+      document.getElementById('tenantModal').classList.add('active');
+    }
+
+    async function saveTenant(event) {
+      event.preventDefault();
+
+      const id = document.getElementById('tenantId').value;
+      const data = {
+        name: document.getElementById('tenantName').value,
+        slug: document.getElementById('tenantSlug').value,
+        plan_type: document.getElementById('tenantPlan').value,
+        status: document.getElementById('tenantStatus').value,
+        custom_domain: document.getElementById('tenantCustomDomain').value || null
+      };
+
+      try {
+        let response;
+        if (id) {
+          // Update existing - we need to add this endpoint
+          response = await fetch(`${API_URL}/api/platform/tenants/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data)
+          });
+        } else {
+          // Create new via registration endpoint
+          response = await fetch(`${API_URL}/api/tenants/register`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({
+              companyName: data.name,
+              slug: data.slug,
+              email: 'admin@' + data.slug + '.com', // Placeholder
+              password: 'TempPassword123!', // They'll need to reset
+              plan: data.plan_type
+            })
+          });
+        }
+
+        if (handleAuthError(response)) return;
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.message || result.error || 'Failed to save tenant');
+        }
+
+        showSuccess(id ? 'Tenant updated successfully!' : 'Tenant created successfully!');
+        closeTenantModal();
+        loadTenants();
+      } catch (error) {
+        showError('Failed to save tenant: ' + error.message);
+      }
+    }
+
+    async function viewTenantDetails(id) {
+      const tenant = allTenants.find(t => t.id === id);
+      if (!tenant) return;
+
+      document.getElementById('tenantDetailsTitle').textContent = tenant.name;
+      document.getElementById('tenantDetailsModal').classList.add('active');
+
+      const content = document.getElementById('tenantDetailsContent');
+      content.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div class="section-card">
+            <h3 style="margin-bottom: 15px;">Basic Info</h3>
+            <p><strong>Name:</strong> ${escapeHtml(tenant.name)}</p>
+            <p><strong>Slug:</strong> ${escapeHtml(tenant.slug)}</p>
+            <p><strong>Status:</strong> ${tenant.status}</p>
+            <p><strong>Plan:</strong> ${tenant.plan_type}</p>
+            <p><strong>Custom Domain:</strong> ${tenant.custom_domain || 'None'}</p>
+            <p><strong>Created:</strong> ${new Date(tenant.created_at).toLocaleString()}</p>
+          </div>
+
+          <div class="section-card">
+            <h3 style="margin-bottom: 15px;">Usage</h3>
+            <p><strong>Conversations this month:</strong> ${tenant.current_month_conversations || 0}</p>
+            <p><strong>Last usage reset:</strong> ${tenant.last_usage_reset_at ? new Date(tenant.last_usage_reset_at).toLocaleString() : 'Never'}</p>
+          </div>
+        </div>
+
+        <div class="section-card" style="margin-top: 20px;">
+          <h3 style="margin-bottom: 15px;">Settings</h3>
+          <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto; max-height: 300px;">${JSON.stringify(tenant.settings, null, 2)}</pre>
+        </div>
+
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+          <button onclick="editTenant('${tenant.id}'); closeTenantDetailsModal();">✏️ Edit Tenant</button>
+          <button onclick="generateApiKey('${tenant.id}', '${escapeHtml(tenant.name)}')" class="secondary">🔑 Generate API Key</button>
+          <button onclick="closeTenantDetailsModal()" class="secondary">Close</button>
+        </div>
+      `;
+    }
+
+    async function generateApiKey(tenantId, tenantName) {
+      if (!confirm(`Generate a new API key for "${tenantName}"?\n\nThis will create a publishable key they can use in their chat widget.`)) {
+        return;
+      }
+
+      try {
+        // For now, show instructions since we need the tenant to be logged in to generate keys
+        alert(`To generate API keys for this tenant:\n\n1. Log in as the tenant at /login.html\n2. Go to /dashboard.html\n3. Navigate to "API Keys" section\n4. Click "Generate New Key"\n\nOr have the tenant do this themselves from their dashboard.`);
+      } catch (error) {
+        showError('Failed to generate API key: ' + error.message);
+      }
+    }
+
+    function closeTenantModal() {
+      document.getElementById('tenantModal').classList.remove('active');
+    }
+
+    function closeTenantDetailsModal() {
+      document.getElementById('tenantDetailsModal').classList.remove('active');
     }
   </script>
 
