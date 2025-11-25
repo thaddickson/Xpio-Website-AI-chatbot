@@ -467,6 +467,73 @@
           margin-top: 8px;
         }
 
+        .xpio-demo-container {
+          background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+          border-radius: 12px;
+          padding: 16px;
+          margin: 12px 0;
+          animation: xpio-message-in 0.3s ease;
+        }
+
+        .xpio-demo-header {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-bottom: 12px;
+          color: white;
+        }
+
+        .xpio-demo-header span {
+          font-size: 20px;
+        }
+
+        .xpio-demo-header h4 {
+          margin: 0;
+          font-size: 14px;
+          font-weight: 600;
+          color: ${this.config.primaryColor};
+        }
+
+        .xpio-demo-video {
+          position: relative;
+          width: 100%;
+          padding-bottom: 56.25%; /* 16:9 aspect ratio */
+          border-radius: 8px;
+          overflow: hidden;
+          background: #000;
+        }
+
+        .xpio-demo-video iframe {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          border: none;
+        }
+
+        .xpio-demo-cta {
+          margin-top: 12px;
+          text-align: center;
+        }
+
+        .xpio-demo-cta button {
+          background: ${this.config.primaryColor};
+          color: white;
+          border: none;
+          padding: 10px 20px;
+          border-radius: 20px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 13px;
+          transition: all 0.2s;
+        }
+
+        .xpio-demo-cta button:hover {
+          background: ${this.config.accentColor};
+          transform: translateY(-1px);
+        }
+
         .xpio-privacy-footer {
           padding: 8px 16px;
           background: #f8f9fa;
@@ -906,6 +973,9 @@
                 } else if (data.type === 'lead_captured') {
                   console.log('✅ Lead captured!', data.leadId);
                   this.showLeadCapturedBadge();
+                } else if (data.type === 'show_demo') {
+                  console.log('🎬 Showing demo video!', data.videoUrl);
+                  this.showDemoVideo(data.videoUrl, data.title || 'Xpio Analytics Demo');
                 } else if (data.type === 'handed_off') {
                   console.log('🤝 Handed off to human!', data.threadTs);
                   this.state.isHandedOff = true;
@@ -940,6 +1010,58 @@
       badge.className = 'xpio-lead-badge';
       badge.textContent = '✓ Information captured - We\'ll be in touch soon!';
       messagesContainer.appendChild(badge);
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    },
+
+    /**
+     * Show demo video embed
+     * @param {string} videoUrl - URL of the video (Loom, YouTube, Vimeo)
+     * @param {string} title - Title to display above video
+     */
+    showDemoVideo(videoUrl, title = 'See Our Platform in Action') {
+      const messagesContainer = document.getElementById('xpio-chat-messages');
+
+      // Convert URL to embed format
+      let embedUrl = videoUrl;
+      if (videoUrl.includes('loom.com/share/')) {
+        // Loom: https://www.loom.com/share/VIDEO_ID -> https://www.loom.com/embed/VIDEO_ID
+        embedUrl = videoUrl.replace('/share/', '/embed/');
+      } else if (videoUrl.includes('youtube.com/watch')) {
+        // YouTube: https://www.youtube.com/watch?v=VIDEO_ID -> https://www.youtube.com/embed/VIDEO_ID
+        const videoId = new URL(videoUrl).searchParams.get('v');
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (videoUrl.includes('youtu.be/')) {
+        // YouTube short: https://youtu.be/VIDEO_ID -> https://www.youtube.com/embed/VIDEO_ID
+        const videoId = videoUrl.split('youtu.be/')[1].split('?')[0];
+        embedUrl = `https://www.youtube.com/embed/${videoId}`;
+      } else if (videoUrl.includes('vimeo.com/')) {
+        // Vimeo: https://vimeo.com/VIDEO_ID -> https://player.vimeo.com/video/VIDEO_ID
+        const videoId = videoUrl.split('vimeo.com/')[1].split('?')[0];
+        embedUrl = `https://player.vimeo.com/video/${videoId}`;
+      }
+
+      const demoContainer = document.createElement('div');
+      demoContainer.className = 'xpio-demo-container';
+      demoContainer.innerHTML = `
+        <div class="xpio-demo-header">
+          <span>🎬</span>
+          <h4>${title}</h4>
+        </div>
+        <div class="xpio-demo-video">
+          <iframe
+            src="${embedUrl}"
+            allowfullscreen
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          ></iframe>
+        </div>
+        <div class="xpio-demo-cta">
+          <button onclick="document.getElementById('xpio-schedule-btn').click()">
+            Ready to see more? Schedule a live demo
+          </button>
+        </div>
+      `;
+
+      messagesContainer.appendChild(demoContainer);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     },
 

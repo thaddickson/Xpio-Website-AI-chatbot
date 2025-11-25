@@ -13,7 +13,8 @@
       "WebFetch(domain:xpiohealth.com)",
       "Bash(findstr:*)",
       "Bash(cd:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(node scripts/view-prompts.js:*)"
     ],
     "deny": [],
     "ask": []

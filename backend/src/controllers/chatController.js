@@ -30,6 +30,21 @@ const MODEL_CHAIN = [
   'claude-3-5-haiku-20241022'    // Haiku 3.5 - fallback 2
 ];
 
+// Demo video configuration
+// Set DEMO_VIDEO_URL in environment to enable (Loom, YouTube, or Vimeo URL)
+const DEMO_VIDEO_URL = process.env.DEMO_VIDEO_URL || null;
+const DEMO_VIDEO_TITLE = process.env.DEMO_VIDEO_TITLE || 'Xpio Analytics Platform Demo';
+
+/**
+ * Check if a lead is high quality (has phone number)
+ * @param {Object} leadInput - The lead data from tool input
+ * @returns {boolean} True if lead is high quality
+ */
+function isQualityLead(leadInput) {
+  // Quality lead = has name + email + phone
+  return !!(leadInput.name && leadInput.email && leadInput.phone);
+}
+
 /**
  * Check if error is a retryable overload error
  */
@@ -405,6 +420,16 @@ export async function handleChatStream(req, res) {
               .catch(err => console.error('Failed to mark lead in conversations:', err));
 
             res.write(`data: ${JSON.stringify({ type: 'lead_captured', leadId: leadResult.leadId })}\n\n`);
+
+            // Show demo video for quality leads (has phone number)
+            if (DEMO_VIDEO_URL && isQualityLead(toolUseDetected.input)) {
+              console.log('🎬 Quality lead detected - showing demo video');
+              res.write(`data: ${JSON.stringify({
+                type: 'show_demo',
+                videoUrl: DEMO_VIDEO_URL,
+                title: DEMO_VIDEO_TITLE
+              })}\n\n`);
+            }
           } catch (error) {
             console.error('Failed to save lead:', error);
             leadResult = {
