@@ -1,4 +1,5 @@
 import PromptVariation from '../models/PromptVariation.js';
+import { clearPromptCache } from './chatController.js';
 
 /**
  * Get all variations for a prompt section
@@ -40,6 +41,9 @@ export async function createVariation(req, res) {
       created_by: 'admin'
     });
 
+    // Clear cache so variation is available immediately
+    clearPromptCache();
+
     res.json({
       variation,
       message: 'Variation created successfully. Activate it to start testing.'
@@ -60,6 +64,10 @@ export async function updateVariation(req, res) {
     const updates = req.body;
 
     const variation = await PromptVariation.update(id, updates);
+
+    // Clear cache so updated variation takes effect immediately
+    clearPromptCache();
+
     res.json({
       variation,
       message: 'Variation updated successfully'
@@ -78,6 +86,10 @@ export async function deleteVariation(req, res) {
   try {
     const { id } = req.params;
     await PromptVariation.delete(id);
+
+    // Clear cache so deletion takes effect immediately
+    clearPromptCache();
+
     res.json({ message: 'Variation deleted successfully' });
   } catch (error) {
     console.error('Error deleting variation:', error);
@@ -122,6 +134,9 @@ export async function promoteVariation(req, res) {
     }
 
     await PromptVariation.promoteToBase(id, prompt_section_id);
+
+    // Clear cache so promoted content takes effect immediately
+    clearPromptCache();
 
     res.json({
       message: 'Variation promoted to base prompt successfully! All tests have been deactivated.'

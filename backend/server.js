@@ -42,6 +42,11 @@ import {
   sendToSlackThread
 } from './src/controllers/slackController.js';
 import {
+  getUsage,
+  getPlatformUsage,
+  getAnthropicUsage
+} from './src/controllers/usageController.js';
+import {
   registerTenant,
   login,
   refreshToken,
@@ -261,6 +266,11 @@ app.post('/api/admin/variations/:id/promote', adminAuth, promoteVariation);
 app.post('/api/admin/ai-editor/improve', adminAuth, improvePrompt);
 app.post('/api/admin/ai-editor/analyze', adminAuth, analyzePrompt);
 app.post('/api/admin/ai-editor/generate', adminAuth, generatePrompt);
+
+// Usage tracking endpoints (protected)
+app.get('/api/admin/usage', adminAuth, getUsage);
+app.get('/api/admin/usage/anthropic', adminAuth, getAnthropicUsage);
+app.get('/api/platform/usage', adminAuth, getPlatformUsage);
 
 // 404 handler
 app.use((req, res) => {

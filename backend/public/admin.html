@@ -365,6 +365,7 @@
       <button class="tab" onclick="switchTab('stats')">📊 Statistics</button>
       <button class="tab" onclick="switchTab('testing')">🧪 A/B Testing</button>
       <button class="tab" onclick="switchTab('tenants')">🏢 Tenants</button>
+      <button class="tab" onclick="switchTab('usage')">💰 API Usage</button>
       <button class="tab" onclick="switchTab('docs')">📖 Docs</button>
     </div>
 
@@ -429,6 +430,42 @@
 
       <div id="tenantsContainer" class="loading">
         Loading tenants...
+      </div>
+    </div>
+
+    <!-- API Usage Tab -->
+    <div id="usage-tab" class="tab-content">
+      <div class="actions">
+        <button onclick="loadUsage()">🔄 Refresh</button>
+        <select id="usagePeriod" onchange="loadUsage()" style="padding: 10px; border: 1px solid #ddd; border-radius: 5px; margin-left: 10px;">
+          <option value="day">Today</option>
+          <option value="week">Last 7 Days</option>
+          <option value="month" selected>This Month</option>
+          <option value="all">All Time</option>
+        </select>
+      </div>
+
+      <div class="stats-grid" id="usageStatsGrid" style="margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="stat-value" id="totalCostUsd">$0.00</div>
+          <div class="stat-label">Total Cost (USD)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalRequests">0</div>
+          <div class="stat-label">API Requests</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalInputTokens">0</div>
+          <div class="stat-label">Input Tokens</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="totalOutputTokens">0</div>
+          <div class="stat-label">Output Tokens</div>
+        </div>
+      </div>
+
+      <div id="usageContainer" class="loading">
+        Loading usage data...
       </div>
     </div>
 
@@ -830,6 +867,8 @@
         loadVariations();
       } else if (tabName === 'tenants') {
         loadTenants();
+      } else if (tabName === 'usage') {
+        loadUsage();
       }
     }
 
@@ -1614,6 +1653,127 @@
       document.getElementById('aiFeedback').focus();
 
       showSuccess('Iteration applied! Describe the next improvement you want.');
+    }
+
+    // ========== API USAGE TRACKING ==========
+
+    async function loadUsage() {
+      const container = document.getElementById('usageContainer');
+      container.innerHTML = '<div class="loading">Loading usage data...</div>';
+
+      const period = document.getElementById('usagePeriod').value;
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/usage?period=${period}`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) {
+          throw new Error('Failed to load usage data');
+        }
+
+        const usage = await response.json();
+        renderUsage(usage);
+      } catch (error) {
+        container.innerHTML = `<div class="error">Failed to load usage data: ${error.message}<br><br>Make sure the api_usage table exists. Run migration 004_api_usage_tracking.sql in Supabase.</div>`;
+      }
+    }
+
+    function renderUsage(usage) {
+      // Update stat cards
+      document.getElementById('totalCostUsd').textContent = '$' + (usage.totalCostUsd || 0).toFixed(4);
+      document.getElementById('totalRequests').textContent = formatNumber(usage.totalRequests || 0);
+      document.getElementById('totalInputTokens').textContent = formatNumber(usage.totalInputTokens || 0);
+      document.getElementById('totalOutputTokens').textContent = formatNumber(usage.totalOutputTokens || 0);
+
+      const container = document.getElementById('usageContainer');
+
+      // Build usage breakdown
+      let byModelHtml = '';
+      if (usage.byModel && Object.keys(usage.byModel).length > 0) {
+        byModelHtml = `
+          <div class="section-card" style="margin-bottom: 20px;">
+            <h3 style="margin-bottom: 15px;">Usage by Model</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Model</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Requests</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Input Tokens</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Output Tokens</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Cost</th>
+              </tr>
+              ${Object.entries(usage.byModel).map(([model, data]) => `
+                <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${escapeHtml(model)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.requests)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.inputTokens)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.outputTokens)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">$${data.costUsd.toFixed(4)}</td>
+                </tr>
+              `).join('')}
+            </table>
+          </div>
+        `;
+      }
+
+      // Build daily breakdown
+      let byDayHtml = '';
+      if (usage.byDay && Object.keys(usage.byDay).length > 0) {
+        const sortedDays = Object.entries(usage.byDay).sort((a, b) => b[0].localeCompare(a[0]));
+        byDayHtml = `
+          <div class="section-card">
+            <h3 style="margin-bottom: 15px;">Daily Usage</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr style="background: #f5f5f5;">
+                <th style="padding: 10px; text-align: left; border-bottom: 1px solid #ddd;">Date</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Requests</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Tokens</th>
+                <th style="padding: 10px; text-align: right; border-bottom: 1px solid #ddd;">Cost</th>
+              </tr>
+              ${sortedDays.map(([day, data]) => `
+                <tr>
+                  <td style="padding: 10px; border-bottom: 1px solid #eee;">${day}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.requests)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">${formatNumber(data.tokens)}</td>
+                  <td style="padding: 10px; text-align: right; border-bottom: 1px solid #eee;">$${data.costUsd.toFixed(4)}</td>
+                </tr>
+              `).join('')}
+            </table>
+          </div>
+        `;
+      }
+
+      // Show info about cache savings
+      const cacheTokens = (usage.totalCacheCreationTokens || 0) + (usage.totalCacheReadTokens || 0);
+      let cacheInfo = '';
+      if (cacheTokens > 0) {
+        cacheInfo = `
+          <div style="margin-bottom: 20px; padding: 15px; background: #e8f5e9; border-left: 4px solid #4CAF50; border-radius: 4px;">
+            <strong>💡 Cache Usage:</strong> ${formatNumber(usage.totalCacheReadTokens || 0)} tokens read from cache (saving money!) • ${formatNumber(usage.totalCacheCreationTokens || 0)} tokens written to cache
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div style="margin-bottom: 20px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
+          <strong>📊 Period:</strong> ${usage.period} • Started: ${new Date(usage.startDate).toLocaleDateString()}
+        </div>
+        ${cacheInfo}
+        ${byModelHtml}
+        ${byDayHtml}
+        ${!byModelHtml && !byDayHtml ? '<div class="loading">No usage data yet. Start some conversations to see API usage!</div>' : ''}
+      `;
+    }
+
+    function formatNumber(num) {
+      if (num >= 1000000) {
+        return (num / 1000000).toFixed(2) + 'M';
+      } else if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+      }
+      return num.toString();
     }
 
     // ========== TENANT MANAGEMENT ==========

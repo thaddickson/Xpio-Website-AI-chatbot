@@ -1,4 +1,5 @@
 import Prompt from '../models/Prompt.js';
+import { clearPromptCache } from './chatController.js';
 
 /**
  * Get all prompt sections
@@ -51,6 +52,9 @@ export async function createPrompt(req, res) {
       last_edited_by: 'admin'
     });
 
+    // Clear cache so new prompt takes effect immediately
+    clearPromptCache();
+
     res.json({ prompt, message: 'Prompt section created successfully' });
   } catch (error) {
     console.error('Error creating prompt:', error);
@@ -68,6 +72,10 @@ export async function updatePrompt(req, res) {
     const updates = { ...req.body, last_edited_by: 'admin' };
 
     const prompt = await Prompt.update(id, updates);
+
+    // Clear cache so updated prompt takes effect immediately
+    clearPromptCache();
+
     res.json({ prompt, message: 'Prompt updated successfully' });
   } catch (error) {
     console.error('Error updating prompt:', error);
@@ -83,6 +91,10 @@ export async function deletePrompt(req, res) {
   try {
     const { id } = req.params;
     await Prompt.delete(id);
+
+    // Clear cache so deletion takes effect immediately
+    clearPromptCache();
+
     res.json({ message: 'Prompt deleted successfully' });
   } catch (error) {
     console.error('Error deleting prompt:', error);

@@ -1,11 +1,13 @@
 import { chatWithClaude, getInitialGreeting } from '../services/claudeService.js';
 import { saveLead } from '../services/leadService.js';
 import { requestHandoff } from '../services/slackService.js';
+import { trackUsage } from '../services/usageService.js';
 import Conversation from '../models/Conversation.js';
 import Lead from '../models/Lead.js';
 import Prompt from '../models/Prompt.js';
 import { v4 as uuidv4 } from 'uuid';
 import Anthropic from '@anthropic-ai/sdk';
+import { DEFAULT_TENANT_ID } from '../models/Tenant.js';
 
 // Lazy initialize Anthropic client
 let anthropic = null;
@@ -27,15 +29,45 @@ const conversations = new Map();
 // Conversation timeout (30 minutes)
 const CONVERSATION_TIMEOUT = 30 * 60 * 1000;
 
-// System prompt - loaded from database and cached
+// System prompt cache - short duration, can be manually cleared
 let cachedSystemPrompt = null;
 let lastPromptLoad = null;
-const PROMPT_CACHE_DURATION = 5 * 60 * 1000; // Refresh every 5 minutes
+const PROMPT_CACHE_DURATION = 30 * 1000; // 30 seconds - short for quick updates
 
+/**
+ * Clear the prompt cache - call this when prompts are updated
+ */
+export function clearPromptCache() {
+  cachedSystemPrompt = null;
+  lastPromptLoad = null;
+  console.log('🗑️ Prompt cache cleared');
+}
+
+/**
+ * Get system prompt with A/B testing variation support
+ * For new conversations - loads fresh with possible variation assignment
+ */
+async function getSystemPromptWithVariations(conversationId, tenantId = null) {
+  try {
+    const result = await Prompt.buildSystemPromptWithVariations(conversationId, tenantId);
+    if (result.usedVariations) {
+      console.log(`🧪 A/B test active for conversation ${conversationId}`);
+    }
+    return result.prompt;
+  } catch (error) {
+    console.error('Failed to load prompt with variations:', error);
+    return getSystemPrompt();
+  }
+}
+
+/**
+ * Get base system prompt (cached briefly for performance)
+ * Used for follow-up messages in same conversation
+ */
 async function getSystemPrompt() {
   const now = Date.now();
 
-  // Use cache if it's recent
+  // Use cache if recent (30 seconds)
   if (cachedSystemPrompt && lastPromptLoad && (now - lastPromptLoad < PROMPT_CACHE_DURATION)) {
     return cachedSystemPrompt;
   }
@@ -135,7 +167,8 @@ export async function handleChatStream(req, res) {
         leadCaptured: false,
         handoffRequested: false,
         createdAt: Date.now(),
-        lastActivity: Date.now()
+        lastActivity: Date.now(),
+        systemPrompt: null // Will be set with A/B variation for this conversation
       };
       conversations.set(conversationId, conversationData);
       isNewConversation = true;
@@ -204,8 +237,18 @@ export async function handleChatStream(req, res) {
         console.log(`🤖 Human inactive for ${Math.floor(timeSinceLastHuman/1000)}s, AI resuming conversation ${conversationId}`);
       }
 
-      // Get system prompt from database
-      const systemPrompt = await getSystemPrompt();
+      // Get system prompt - use A/B variations for new conversations, cached for existing
+      const tenantId = req.tenantId || DEFAULT_TENANT_ID;
+      let systemPrompt;
+
+      if (isNewConversation || !conversationData.systemPrompt) {
+        // New conversation: load fresh prompt with possible A/B variation
+        systemPrompt = await getSystemPromptWithVariations(conversationId, tenantId);
+        conversationData.systemPrompt = systemPrompt; // Cache for this conversation
+      } else {
+        // Existing conversation: use the same prompt for consistency
+        systemPrompt = conversationData.systemPrompt;
+      }
 
       // Create streaming request to Claude
       const stream = await getAnthropic().messages.stream({
@@ -236,6 +279,13 @@ export async function handleChatStream(req, res) {
 
       // Handle message completion
       stream.on('message', async (message) => {
+        // Track API usage for this request
+        const tenantId = req.tenantId || DEFAULT_TENANT_ID;
+        if (message.usage) {
+          trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', message.usage)
+            .catch(err => console.error('Failed to track usage:', err));
+        }
+
         // If tool was used, process it
         if (toolUseDetected && toolUseDetected.name === 'save_lead') {
           console.log(`💾 Saving lead data...`);
@@ -293,6 +343,12 @@ export async function handleChatStream(req, res) {
             tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL], // CRITICAL: Include tools!
             messages: conversationData.messages,
           });
+
+          // Track usage for follow-up call
+          if (followUpResponse.usage) {
+            trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', followUpResponse.usage)
+              .catch(err => console.error('Failed to track follow-up usage:', err));
+          }
 
           // Check if Claude wants to use a tool (likely check_calendar_availability)
           let followUpToolUse = null;
@@ -362,6 +418,12 @@ export async function handleChatStream(req, res) {
               messages: conversationData.messages,
             });
 
+            // Track usage for calendar response
+            if (calendarResponse.usage) {
+              trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', calendarResponse.usage)
+                .catch(err => console.error('Failed to track calendar usage:', err));
+            }
+
             let calendarText = '';
             for (const block of calendarResponse.content) {
               if (block.type === 'text') {
@@ -427,6 +489,12 @@ export async function handleChatStream(req, res) {
           // Get Claude's follow-up message with the availability info
           console.log('💬 Getting follow-up message from Claude with availability...');
           const followUpResponse = await chatWithClaude(conversationData.messages, conversationId);
+
+          // Track usage for calendar availability follow-up
+          if (followUpResponse.usage) {
+            trackUsage(tenantId, conversationId, followUpResponse.model || 'claude-opus-4-5-20251101', followUpResponse.usage)
+              .catch(err => console.error('Failed to track calendar availability follow-up usage:', err));
+          }
 
           let followUpText = '';
           for (const block of followUpResponse.content) {
@@ -513,6 +581,12 @@ export async function handleChatStream(req, res) {
             system: systemPrompt,
             messages: conversationData.messages,
           });
+
+          // Track usage for handoff follow-up
+          if (followUpResponse.usage) {
+            trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', followUpResponse.usage)
+              .catch(err => console.error('Failed to track handoff follow-up usage:', err));
+          }
 
           const followUpText = followUpResponse.content
             .filter(block => block.type === 'text')
