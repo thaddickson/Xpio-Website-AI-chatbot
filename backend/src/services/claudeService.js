@@ -685,7 +685,12 @@ export const HANDOFF_TOOL = {
 // Tool definition for checking Calendly availability
 export const CALENDLY_TOOL = {
   name: 'check_calendar_availability',
-  description: 'MANDATORY: Use this IMMEDIATELY after save_lead succeeds OR when user asks about meeting times/availability. This returns Thad\'s actual available calendar slots from Calendly. You DO have calendar access via this tool - use it! Returns 5 real upcoming time slots. Required flow: save_lead → check_calendar_availability → show times. NEVER say "I don\'t have calendar access" - you have this tool!',
+  description: `MANDATORY: Use this IMMEDIATELY after save_lead succeeds OR when user asks about meeting times/availability. This returns Thad's actual available calendar slots from Calendly.
+
+IMPORTANT: The tool returns a 'formattedSchedule' field - display this EXACTLY as provided. Do NOT add individual booking URLs - just show the clean formatted times and tell them to click the Schedule a Meeting button.
+
+Required flow: save_lead → check_calendar_availability → display formattedSchedule.
+NEVER say "I don't have calendar access" - you have this tool!`,
   input_schema: {
     type: 'object',
     properties: {

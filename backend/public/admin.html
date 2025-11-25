@@ -670,6 +670,8 @@
           <strong>💡 How it works:</strong> Describe what's not working with your prompt, and AI will suggest improvements.
         </div>
 
+        <div id="aiEditorError" style="display: none; margin-bottom: 15px; padding: 12px; background: #fee; color: #c00; border-radius: 4px; border: 1px solid #fcc;"></div>
+
         <div class="form-group">
           <label for="aiFeedback">What's the problem? What do you want to improve?</label>
           <textarea id="aiFeedback" placeholder="e.g., 'Responses are too long', 'Not using the calendar tool enough', 'Too formal, make it casual'" rows="3" style="width: 100%;"></textarea>
@@ -1290,6 +1292,19 @@
       setTimeout(() => div.className = '', 5000);
     }
 
+    // Show error within AI Editor modal
+    function showAIEditorError(message) {
+      const div = document.getElementById('aiEditorError');
+      div.textContent = message;
+      div.style.display = 'block';
+      setTimeout(() => div.style.display = 'none', 5000);
+    }
+
+    // Hide AI Editor error
+    function hideAIEditorError() {
+      document.getElementById('aiEditorError').style.display = 'none';
+    }
+
     function escapeHtml(text) {
       const div = document.createElement('div');
       div.textContent = text;
@@ -1665,11 +1680,12 @@
     }
 
     async function getAIImprovement() {
+      hideAIEditorError(); // Clear any previous error
       const currentContent = document.getElementById('variationContent').value;
       let feedback = document.getElementById('aiFeedback').value.trim();
 
       if (!feedback) {
-        showError('Please describe what you want to improve.');
+        showAIEditorError('Please describe what you want to improve.');
         return;
       }
 
@@ -1723,7 +1739,7 @@
         document.getElementById('aiResults').style.display = 'block';
 
       } catch (error) {
-        showError('Failed to get AI suggestions: ' + error.message);
+        showAIEditorError('Failed to get AI suggestions: ' + error.message);
         document.getElementById('aiLoading').style.display = 'none';
       } finally {
         improveBtn.disabled = false;
@@ -1732,10 +1748,11 @@
     }
 
     async function quickAnalyze() {
+      hideAIEditorError(); // Clear any previous error
       const currentContent = document.getElementById('variationContent').value;
 
       if (!currentContent.trim()) {
-        showError('Please enter some content first.');
+        showAIEditorError('Please enter some content first.');
         return;
       }
 
@@ -1758,7 +1775,7 @@
         alert(`AI Analysis:\n\n${data.suggestions}\n\nUse the feedback box to request specific improvements.`);
 
       } catch (error) {
-        showError('Failed to analyze prompt: ' + error.message);
+        showAIEditorError('Failed to analyze prompt: ' + error.message);
       } finally {
         analyzeBtn.disabled = false;
         analyzeBtn.textContent = originalText;
@@ -2227,6 +2244,10 @@
         const statusColor = conv.flagged ? '#f44336' : (conv.lead_captured ? '#4CAF50' : '#999');
         const statusText = conv.flagged ? 'Flagged' : (conv.lead_captured ? 'Lead Captured' : 'No Lead');
 
+        const variationBadges = (conv.variation_names || []).map(name =>
+          `<span style="display: inline-block; padding: 2px 8px; background: #9C27B0; color: white; border-radius: 3px; font-size: 11px; margin-left: 5px;">🧪 ${escapeHtml(name)}</span>`
+        ).join('');
+
         return `
           <div class="section-card" style="margin-bottom: 15px; border-left: 4px solid ${statusColor};">
             <div class="section-header">
@@ -2237,10 +2258,12 @@
                     ${statusText}
                   </span>
                   ${conv.is_handed_off ? '<span style="display: inline-block; padding: 2px 8px; background: #FF9800; color: white; border-radius: 3px; font-size: 11px; margin-left: 5px;">Handed Off</span>' : ''}
+                  ${variationBadges}
                 </div>
                 <div class="section-meta">
                   ${messages.length} messages | ${new Date(conv.created_at).toLocaleString()}
                   ${conv.flag_reason ? ` | Reason: ${escapeHtml(conv.flag_reason)}` : ''}
+                  ${conv.has_variation ? ' | A/B Test' : ''}
                 </div>
               </div>
             </div>

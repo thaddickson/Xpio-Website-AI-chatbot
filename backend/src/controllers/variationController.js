@@ -23,7 +23,7 @@ export async function getVariations(req, res) {
 export async function createVariation(req, res) {
   try {
     const { promptId } = req.params;
-    const { variation_name, content, traffic_percentage, notes } = req.body;
+    const { variation_name, content, traffic_percentage, notes, is_active } = req.body;
 
     if (!variation_name || !content) {
       return res.status(400).json({
@@ -36,7 +36,7 @@ export async function createVariation(req, res) {
       variation_name,
       content,
       traffic_percentage: traffic_percentage || 0,
-      is_active: false, // Start inactive by default
+      is_active: is_active || false, // Use value from request, default to false
       notes,
       created_by: 'admin'
     });

@@ -108,27 +108,41 @@ export async function getAvailableTimes() {
       };
     }
 
-    // Format times conversationally (take first 5)
-    const slots = data.collection.slice(0, 5).map(slot => {
+    // Group times by date for cleaner display (take first 8 slots)
+    const slotsByDate = {};
+    data.collection.slice(0, 8).forEach(slot => {
       const date = new Date(slot.start_time);
-      const options = {
-        weekday: 'long',
+      const dateKey = date.toLocaleDateString('en-US', {
+        weekday: 'short',
         month: 'short',
-        day: 'numeric',
+        day: 'numeric'
+      });
+      const timeStr = date.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
-        timeZoneName: 'short'
-      };
-      return {
-        formatted: date.toLocaleString('en-US', options),
-        startTime: slot.start_time,
-        bookingUrl: `${process.env.CALENDLY_EVENT_LINK}?date=${date.toISOString().split('T')[0]}&time=${date.toTimeString().split(' ')[0]}`
-      };
+        hour12: true
+      });
+
+      if (!slotsByDate[dateKey]) {
+        slotsByDate[dateKey] = [];
+      }
+      slotsByDate[dateKey].push(timeStr);
     });
+
+    // Format as clean text for Claude to display
+    let formattedSchedule = "Here are Thad's available times:\n\n";
+    for (const [dateStr, times] of Object.entries(slotsByDate)) {
+      formattedSchedule += `**${dateStr}**\n`;
+      times.forEach(time => {
+        formattedSchedule += `- ${time}\n`;
+      });
+      formattedSchedule += '\n';
+    }
+    formattedSchedule += "To book, click the 'Schedule a Meeting' button below.";
 
     return {
       available: true,
-      slots: slots,
+      formattedSchedule: formattedSchedule,
       bookingLink: process.env.CALENDLY_EVENT_LINK
     };
 

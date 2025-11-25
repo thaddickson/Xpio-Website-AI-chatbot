@@ -169,20 +169,24 @@
         .xpio-chat-messages {
           flex: 1;
           overflow-y: auto;
+          overflow-x: hidden;
           padding: 16px;
+          padding-left: 40px;
           display: flex;
           flex-direction: column;
-          gap: 12px;
+          gap: 16px;
           background: #f8f9fa;
         }
 
         .xpio-message {
           padding: 12px;
           border-radius: 8px;
-          max-width: 80%;
+          max-width: 85%;
           word-wrap: break-word;
-          line-height: 1.5;
+          overflow-wrap: break-word;
+          line-height: 1.6;
           font-size: 14px;
+          white-space: pre-wrap;
         }
 
         .xpio-message.user {
@@ -198,6 +202,8 @@
           color: white;
           border-bottom-left-radius: 2px;
           box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
+          position: relative;
+          margin-left: 0;
         }
 
         .xpio-message.assistant::before {
@@ -218,6 +224,8 @@
           color: white;
           border-bottom-left-radius: 2px;
           box-shadow: 0 2px 8px rgba(16, 185, 129, 0.2);
+          position: relative;
+          margin-left: 0;
         }
 
         .xpio-typing-indicator {
@@ -602,6 +610,39 @@
     },
 
     /**
+     * Format message content - converts URLs to links and handles basic markdown
+     */
+    formatMessage(content) {
+      // Escape HTML first to prevent XSS
+      let safe = content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+      // Convert URLs to clickable links
+      safe = safe.replace(
+        /(https?:\/\/[^\s<]+[^\s<.,;:!?)"\'])/gi,
+        '<a href="$1" target="_blank" rel="noopener noreferrer" style="color: #fff; text-decoration: underline;">$1</a>'
+      );
+
+      // Convert markdown bold **text** to <strong>
+      safe = safe.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+      // Convert markdown headers (## Header) - for date headers
+      safe = safe.replace(/^##\s+(.+)$/gm, '<strong style="display:block; margin-top:8px;">$1</strong>');
+
+      // Convert line breaks
+      safe = safe.replace(/\n/g, '<br>');
+
+      // Convert bullet points (- item) to styled list items
+      safe = safe.replace(/^-\s+(.+)$/gm, '&nbsp;&nbsp;• $1');
+
+      return safe;
+    },
+
+    /**
      * Add message to chat
      */
     addMessage(role, content) {
@@ -610,7 +651,7 @@
       const messagesContainer = document.getElementById('xpio-chat-messages');
       const messageDiv = document.createElement('div');
       messageDiv.className = `xpio-message ${role}`;
-      messageDiv.textContent = content;
+      messageDiv.innerHTML = this.formatMessage(content);
 
       messagesContainer.appendChild(messageDiv);
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -625,7 +666,7 @@
       const lastMessage = messages[messages.length - 1];
 
       if (lastMessage) {
-        lastMessage.textContent = content;
+        lastMessage.innerHTML = this.formatMessage(content);
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
       }
     },
@@ -738,15 +779,13 @@
     },
 
     /**
-     * Show lead captured badge
+     * Show lead captured badge - DISABLED per client feedback
+     * The badge was ending conversations prematurely when followed by questions
      */
     showLeadCapturedBadge() {
-      const messagesContainer = document.getElementById('xpio-chat-messages');
-      const badge = document.createElement('div');
-      badge.className = 'xpio-lead-badge';
-      badge.textContent = '✓ Information captured - We\'ll be in touch soon!';
-      messagesContainer.appendChild(badge);
-      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      // Intentionally empty - badge removed to keep conversation flowing naturally
+      // Lead capture still works, just no visual interruption
+      console.log('✓ Lead information captured');
     }
   };
 

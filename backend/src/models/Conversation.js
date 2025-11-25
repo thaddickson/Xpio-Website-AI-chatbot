@@ -23,10 +23,17 @@ class Conversation {
    * Create a new conversation in the database
    * @param {string} conversationId - Unique conversation identifier
    * @param {Object} metadata - Optional metadata (user_agent, ip_address, referrer)
+   * @param {Object} firstMessage - Optional first message to include (prevents race condition)
    * @returns {Object} Created conversation
    */
-  static async create(conversationId, metadata = {}) {
+  static async create(conversationId, metadata = {}, firstMessage = null) {
     try {
+      // If first message provided, include it in the initial messages array
+      const initialMessages = firstMessage ? [{
+        ...firstMessage,
+        timestamp: new Date().toISOString()
+      }] : [];
+
       const { data, error } = await getSupabase()
         .from('conversations')
         .insert([
@@ -35,8 +42,8 @@ class Conversation {
             user_agent: metadata.user_agent || null,
             ip_address: metadata.ip_address || null,
             referrer: metadata.referrer || null,
-            messages: [],
-            message_count: 0,
+            messages: initialMessages,
+            message_count: initialMessages.length,
             status: 'active'
           }
         ])
@@ -44,7 +51,7 @@ class Conversation {
         .single();
 
       if (error) throw error;
-      console.log(`📝 Conversation logged to database: ${conversationId}`);
+      console.log(`📝 Conversation logged to database: ${conversationId}${firstMessage ? ' (with first message)' : ''}`);
       return data;
     } catch (error) {
       // If conversation already exists (unique constraint), that's okay
@@ -306,6 +313,41 @@ class Conversation {
         });
       }
 
+      // Fetch variation assignments for these conversations
+      if (results.length > 0) {
+        const conversationIds = results.map(c => c.conversation_id);
+        const { data: assignments, error: assignmentError } = await getSupabase()
+          .from('conversation_test_assignments')
+          .select(`
+            conversation_id,
+            prompt_variations (
+              id,
+              variation_name
+            )
+          `)
+          .in('conversation_id', conversationIds);
+
+        if (!assignmentError && assignments) {
+          // Create a map of conversation_id -> variation names
+          const variationMap = {};
+          assignments.forEach(a => {
+            if (!variationMap[a.conversation_id]) {
+              variationMap[a.conversation_id] = [];
+            }
+            if (a.prompt_variations) {
+              variationMap[a.conversation_id].push(a.prompt_variations.variation_name);
+            }
+          });
+
+          // Add variation info to each conversation
+          results = results.map(conv => ({
+            ...conv,
+            variation_names: variationMap[conv.conversation_id] || [],
+            has_variation: (variationMap[conv.conversation_id] || []).length > 0
+          }));
+        }
+      }
+
       return results;
     } catch (error) {
       console.error('Database error fetching conversations for review:', error);
@@ -371,7 +413,7 @@ class Conversation {
     try {
       const { data, error } = await getSupabase()
         .from('conversations')
-        .select('status, lead_captured, message_count');
+        .select('status, lead_captured, message_count, is_handed_off');
 
       if (error) throw error;
 
@@ -382,6 +424,7 @@ class Conversation {
         abandoned: data.filter(c => c.status === 'abandoned').length,
         withLeads: data.filter(c => c.lead_captured).length,
         withoutLeads: data.filter(c => !c.lead_captured).length,
+        handoffsRequested: data.filter(c => c.is_handed_off).length,
         avgMessages: data.length > 0
           ? (data.reduce((sum, c) => sum + c.message_count, 0) / data.length).toFixed(1)
           : 0
@@ -397,6 +440,7 @@ class Conversation {
         abandoned: 0,
         withLeads: 0,
         withoutLeads: 0,
+        handoffsRequested: 0,
         avgMessages: 0
       };
     }

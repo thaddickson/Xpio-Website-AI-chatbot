@@ -159,6 +159,12 @@ export async function handleChatStream(req, res) {
     let conversationData;
     let isNewConversation = false;
 
+    // Build user message object
+    const userMessage = {
+      role: 'user',
+      content: message
+    };
+
     if (!conversationId || !conversations.has(conversationId)) {
       conversationId = uuidv4();
       conversationData = {
@@ -174,29 +180,26 @@ export async function handleChatStream(req, res) {
       isNewConversation = true;
       console.log(`📝 New conversation started: ${conversationId}`);
 
-      // Create conversation in database (don't wait)
+      // Create conversation in database WITH the first message included
+      // This prevents race condition where addMessage runs before create completes
       Conversation.create(conversationId, {
         user_agent: req.headers['user-agent'],
         ip_address: req.ip,
         referrer: req.headers['referer']
-      }).catch(err => console.error('Failed to create conversation in DB:', err));
+      }, userMessage).catch(err => console.error('Failed to create conversation in DB:', err));
     } else {
       conversationData = conversations.get(conversationId);
       conversationData.lastActivity = Date.now();
+
+      // Log user message to database (only for existing conversations)
+      Conversation.addMessage(conversationId, userMessage)
+        .catch(err => console.error('Failed to log user message:', err));
     }
 
-    // Add user message to history
-    const userMessage = {
-      role: 'user',
-      content: message
-    };
+    // Add user message to in-memory history
     conversationData.messages.push(userMessage);
 
     console.log(`💬 User message in ${conversationId}: ${message.substring(0, 100)}...`);
-
-    // Log user message to database (don't wait)
-    Conversation.addMessage(conversationId, userMessage)
-      .catch(err => console.error('Failed to log user message:', err));
 
     // Set up Server-Sent Events (SSE) for streaming
     res.setHeader('Content-Type', 'text/event-stream');
@@ -687,27 +690,25 @@ export function handleEndConversation(req, res) {
  */
 export async function handleGetStats(req, res) {
   try {
-    // Get database stats
+    // Get database stats (includes handoff count from DB)
     const dbStats = await Conversation.getStats();
 
     // Get recent leads (last 10)
     const recentLeads = await Lead.getAll(10, 0);
 
-    // Count tool usage in conversations
-    let handoffsRequested = 0;
+    // Count calendar checks from active in-memory conversations only
     let calendarChecks = 0;
-
     Array.from(conversations.values()).forEach(conv => {
-      if (conv.handoffRequested) handoffsRequested++;
       if (conv.calendarChecked) calendarChecks++;
     });
 
     // Return stats in format expected by frontend
+    // Use database handoff count (persisted) instead of in-memory (volatile)
     res.json({
       totalConversations: dbStats.total || 0,
       totalLeads: dbStats.withLeads || 0,
       activeConversations: conversations.size,
-      handoffsRequested,
+      handoffsRequested: dbStats.handoffsRequested || 0,
       calendarChecks,
       recentLeads: recentLeads.map(lead => ({
         name: lead.name,
