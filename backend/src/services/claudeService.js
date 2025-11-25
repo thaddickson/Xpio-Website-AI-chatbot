@@ -17,15 +17,16 @@ function getAnthropic() {
 // Customize this system prompt with Xpio Health's specific information
 export const SYSTEM_PROMPT = `You are an intelligent sales assistant for Xpio Health, a national healthcare technology and consulting firm.
 
-## 🚨 CALENDAR BOOKING - READ THIS FIRST 🚨
+## 🚨 MEETING SCHEDULING - READ THIS FIRST 🚨
 
-YOU HAVE A CALENDAR TOOL. When someone wants to schedule/book a meeting:
-1. Get name, email, phone
-2. Use save_lead tool
-3. Use check_calendar_availability tool
-4. Show the actual available times
+When someone wants to schedule/book a meeting:
+1. Get their name, email, and phone
+2. Use save_lead tool to capture their info
+3. Direct them to click the "📅 Schedule a Meeting" button in the chat widget to book directly with Thad
 
-NEVER say "I don't have calendar access" or "someone will reach out" - YOU SHOW THE TIMES using check_calendar_availability tool!
+The scheduling link is: https://calendly.com/thad-xpiohealth/30min
+
+IMPORTANT: Tell users to use the "Schedule a Meeting" button right there in the chat - it will open Thad's calendar where they can pick any available time that works for them.
 
 ## About Xpio Health - The Company
 Xpio Health is a **national technology and healthcare consulting firm** with a presence across **12 states** and customers throughout the United States.
@@ -466,8 +467,8 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 
 ## Meeting Booking Rules
 
-Only show calendar times to qualified leads (name + email + phone collected).
-After saving lead with save_lead tool → immediately use check_calendar_availability tool → show times.
+After saving lead with save_lead tool → direct them to click the "📅 Schedule a Meeting" button in the chat to book with Thad.
+The button links to: https://calendly.com/thad-xpiohealth/30min
 
 ## CRITICAL: When to Connect Visitors to a Human Team Member
 
@@ -564,7 +565,7 @@ Bad AI: "I can definitely help! First let me tell you about our services. We off
 
 ✅ CORRECT - Immediate booking link:
 User: "can you book me a meeting with thad"
-Good AI: "Absolutely! You can book time with Thad here: https://app.usemotion.com/meet/thad-dickson/9bhgxjj"
+Good AI: "Absolutely! Just click the 📅 Schedule a Meeting button right here in the chat to pick a time with Thad!"
 
 ❌ WRONG - Long explanation:
 User: "tell me about analytics"
@@ -715,7 +716,7 @@ export async function chatWithClaude(messages, conversationId) {
       model: 'claude-opus-4-5-20251101', // Claude Opus 4.5 - latest and most capable
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
-      tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],
+      tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
       messages: messages,
       temperature: 0.7, // Balanced creativity and consistency
     });

@@ -343,7 +343,7 @@ async function startServer() {
       console.log(`📊 Stats: http://localhost:${PORT}/api/stats`);
       console.log('');
       console.log(`🔧 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🤖 Model: Claude Opus 4.1`);
+      console.log(`🤖 Model: Claude Opus 4.5`);
       console.log('');
       console.log('Press Ctrl+C to stop the server');
       console.log('');

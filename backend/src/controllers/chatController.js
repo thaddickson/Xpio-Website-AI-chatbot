@@ -87,7 +87,7 @@ async function getSystemPrompt() {
 }
 
 // Import fallback prompt and tool definitions
-import { LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL } from '../services/claudeService.js';
+import { LEAD_CAPTURE_TOOL, HANDOFF_TOOL } from '../services/claudeService.js';
 
 /**
  * Clean up old conversations periodically
@@ -110,6 +110,37 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000); // Run every 5 minutes
+
+/**
+ * Restore a conversation from the database if it exists
+ * This handles server restarts where in-memory state is lost
+ * @param {string} conversationId - The conversation ID to restore
+ * @returns {Object|null} Restored conversation data or null if not found
+ */
+async function restoreConversationFromDB(conversationId) {
+  try {
+    const dbConversation = await Conversation.getById(conversationId);
+    if (dbConversation && dbConversation.messages && dbConversation.messages.length > 0) {
+      // Restore to in-memory map
+      const conversationData = {
+        id: conversationId,
+        messages: dbConversation.messages || [],
+        leadCaptured: dbConversation.lead_id !== null,
+        handoffRequested: dbConversation.handed_off || false,
+        createdAt: new Date(dbConversation.created_at).getTime(),
+        lastActivity: Date.now(),
+        systemPrompt: null // Will be loaded fresh
+      };
+      conversations.set(conversationId, conversationData);
+      console.log(`🔄 Restored conversation from database: ${conversationId} (${conversationData.messages.length} messages)`);
+      return conversationData;
+    }
+    return null;
+  } catch (error) {
+    console.error('Failed to restore conversation from DB:', error);
+    return null;
+  }
+}
 
 /**
  * Handle chat messages with STREAMING support
@@ -166,27 +197,42 @@ export async function handleChatStream(req, res) {
     };
 
     if (!conversationId || !conversations.has(conversationId)) {
-      conversationId = uuidv4();
-      conversationData = {
-        id: conversationId,
-        messages: [],
-        leadCaptured: false,
-        handoffRequested: false,
-        createdAt: Date.now(),
-        lastActivity: Date.now(),
-        systemPrompt: null // Will be set with A/B variation for this conversation
-      };
-      conversations.set(conversationId, conversationData);
-      isNewConversation = true;
-      console.log(`📝 New conversation started: ${conversationId}`);
+      // If client provided a conversationId, try to restore from database first
+      // This handles server restarts where in-memory state is lost
+      if (clientConversationId) {
+        conversationData = await restoreConversationFromDB(clientConversationId);
+        if (conversationData) {
+          conversationId = clientConversationId;
+          // Log user message to database (conversation already exists)
+          Conversation.addMessage(conversationId, userMessage)
+            .catch(err => console.error('Failed to log user message:', err));
+        }
+      }
 
-      // Create conversation in database WITH the first message included
-      // This prevents race condition where addMessage runs before create completes
-      Conversation.create(conversationId, {
-        user_agent: req.headers['user-agent'],
-        ip_address: req.ip,
-        referrer: req.headers['referer']
-      }, userMessage).catch(err => console.error('Failed to create conversation in DB:', err));
+      // If not restored, create new conversation
+      if (!conversationData) {
+        conversationId = uuidv4();
+        conversationData = {
+          id: conversationId,
+          messages: [],
+          leadCaptured: false,
+          handoffRequested: false,
+          createdAt: Date.now(),
+          lastActivity: Date.now(),
+          systemPrompt: null // Will be set with A/B variation for this conversation
+        };
+        conversations.set(conversationId, conversationData);
+        isNewConversation = true;
+        console.log(`📝 New conversation started: ${conversationId}`);
+
+        // Create conversation in database WITH the first message included
+        // This prevents race condition where addMessage runs before create completes
+        Conversation.create(conversationId, {
+          user_agent: req.headers['user-agent'],
+          ip_address: req.ip,
+          referrer: req.headers['referer']
+        }, userMessage).catch(err => console.error('Failed to create conversation in DB:', err));
+      }
     } else {
       conversationData = conversations.get(conversationId);
       conversationData.lastActivity = Date.now();
@@ -258,7 +304,7 @@ export async function handleChatStream(req, res) {
         model: 'claude-opus-4-5-20251101', // Claude Opus 4.5 - latest
         max_tokens: 4096,
         system: systemPrompt,
-        tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],
+        tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
         messages: conversationData.messages,
         temperature: 0.7,
       });
@@ -338,12 +384,12 @@ export async function handleChatStream(req, res) {
             }]
           });
 
-          // Get Claude's follow-up message WITH TOOLS so it can call check_calendar_availability
+          // Get Claude's follow-up message
           const followUpResponse = await getAnthropic().messages.create({
             model: 'claude-opus-4-5-20251101',
             max_tokens: 2048,
             system: systemPrompt,
-            tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL], // CRITICAL: Include tools!
+            tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL], // CRITICAL: Include tools!
             messages: conversationData.messages,
           });
 
@@ -353,7 +399,7 @@ export async function handleChatStream(req, res) {
               .catch(err => console.error('Failed to track follow-up usage:', err));
           }
 
-          // Check if Claude wants to use a tool (likely check_calendar_availability)
+          // Check if Claude wants to use another tool
           let followUpToolUse = null;
           let followUpText = '';
           for (const block of followUpResponse.content) {
@@ -381,144 +427,6 @@ export async function handleChatStream(req, res) {
           Conversation.addMessage(conversationId, { role: 'assistant', content: followUpText })
             .catch(err => console.error('Failed to log follow-up message:', err));
 
-          // If Claude wants to check calendar after saving lead, handle it!
-          if (followUpToolUse && followUpToolUse.name === 'check_calendar_availability') {
-            console.log(`📅 Claude wants to check calendar after save_lead - handling...`);
-
-            conversationData.calendarChecked = true;
-
-            // Get available times from Calendly
-            const { getAvailableTimes } = await import('../services/calendlyService.js');
-            let availabilityResult;
-            try {
-              availabilityResult = await getAvailableTimes();
-              console.log('📅 Calendly availability:', availabilityResult);
-            } catch (error) {
-              console.error('Failed to check Calendly availability:', error);
-              availabilityResult = {
-                available: false,
-                error: error.message,
-                message: "I'm having trouble checking the calendar right now.",
-                bookingLink: process.env.CALENDLY_EVENT_LINK
-              };
-            }
-
-            // Send tool result back to Claude
-            conversationData.messages.push({
-              role: 'user',
-              content: [{
-                type: 'tool_result',
-                tool_use_id: followUpToolUse.id,
-                content: JSON.stringify(availabilityResult)
-              }]
-            });
-
-            // Get Claude's final response with the calendar times
-            const calendarResponse = await getAnthropic().messages.create({
-              model: 'claude-opus-4-5-20251101',
-              max_tokens: 2048,
-              system: systemPrompt,
-              messages: conversationData.messages,
-            });
-
-            // Track usage for calendar response
-            if (calendarResponse.usage) {
-              trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', calendarResponse.usage)
-                .catch(err => console.error('Failed to track calendar usage:', err));
-            }
-
-            let calendarText = '';
-            for (const block of calendarResponse.content) {
-              if (block.type === 'text') {
-                calendarText += block.text;
-              }
-            }
-
-            // Add to history and stream
-            conversationData.messages.push({
-              role: 'assistant',
-              content: calendarText
-            });
-
-            Conversation.addMessage(conversationId, { role: 'assistant', content: calendarText })
-              .catch(err => console.error('Failed to log calendar message:', err));
-
-            res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + calendarText })}\n\n`);
-            fullResponse += '\n\n' + calendarText;
-          }
-        } else if (toolUseDetected && toolUseDetected.name === 'check_calendar_availability') {
-          console.log(`📅 Checking Calendly availability...`);
-
-          // Track calendar check
-          conversationData.calendarChecked = true;
-
-          // Add assistant's response to history
-          const assistantMessage = {
-            role: 'assistant',
-            content: message.content
-          };
-          conversationData.messages.push(assistantMessage);
-
-          // Log assistant message to database (don't wait)
-          Conversation.addMessage(conversationId, { role: 'assistant', content: fullResponse })
-            .catch(err => console.error('Failed to log assistant message:', err));
-
-          // Get available times from Calendly
-          const { getAvailableTimes } = await import('../services/calendlyService.js');
-          let availabilityResult;
-          try {
-            availabilityResult = await getAvailableTimes();
-            console.log('📅 Calendly availability:', availabilityResult);
-          } catch (error) {
-            console.error('Failed to check Calendly availability:', error);
-            availabilityResult = {
-              available: false,
-              error: error.message,
-              message: "I'm having trouble checking the calendar right now.",
-              bookingLink: process.env.CALENDLY_EVENT_LINK
-            };
-          }
-
-          // Send tool result back to Claude
-          conversationData.messages.push({
-            role: 'user',
-            content: [{
-              type: 'tool_result',
-              tool_use_id: toolUseDetected.id,
-              content: JSON.stringify(availabilityResult)
-            }]
-          });
-
-          // Get Claude's follow-up message with the availability info
-          console.log('💬 Getting follow-up message from Claude with availability...');
-          const followUpResponse = await chatWithClaude(conversationData.messages, conversationId);
-
-          // Track usage for calendar availability follow-up
-          if (followUpResponse.usage) {
-            trackUsage(tenantId, conversationId, followUpResponse.model || 'claude-opus-4-5-20251101', followUpResponse.usage)
-              .catch(err => console.error('Failed to track calendar availability follow-up usage:', err));
-          }
-
-          let followUpText = '';
-          for (const block of followUpResponse.content) {
-            if (block.type === 'text') {
-              followUpText += block.text;
-            }
-          }
-
-          // Add follow-up to conversation history
-          conversationData.messages.push({
-            role: 'assistant',
-            content: followUpText
-          });
-
-          // Log follow-up message to database (don't wait)
-          Conversation.addMessage(conversationId, { role: 'assistant', content: followUpText })
-            .catch(err => console.error('Failed to log follow-up message:', err));
-
-          // Stream the follow-up message
-          res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
-          fullResponse += '\n\n' + followUpText;
         } else if (toolUseDetected && toolUseDetected.name === 'request_human_help') {
           console.log(`🆘 Handoff requested for conversation: ${conversationId}`);
 
