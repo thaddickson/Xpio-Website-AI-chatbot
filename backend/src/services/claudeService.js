@@ -707,7 +707,7 @@ export const CALENDLY_TOOL = {
 export async function chatWithClaude(messages, conversationId) {
   try {
     const response = await getAnthropic().messages.create({
-      model: 'claude-opus-4-20250514', // Claude Opus 4.1 - best for lead qualification
+      model: 'claude-opus-4-5-20251101', // Claude Opus 4.5 - latest and most capable
       max_tokens: 4096,
       system: SYSTEM_PROMPT,
       tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],

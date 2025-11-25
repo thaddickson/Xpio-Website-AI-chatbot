@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_TENANT_ID } from './Tenant.js';
 
 // Lazy initialize Supabase client
 let supabase = null;
@@ -22,9 +23,10 @@ class Lead {
   /**
    * Create a new lead in the database
    * @param {Object} leadData - Lead information
+   * @param {string} tenantId - Tenant ID (optional, defaults to DEFAULT_TENANT_ID)
    * @returns {Object} Created lead with ID
    */
-  static async create(leadData) {
+  static async create(leadData, tenantId = null) {
     const {
       conversationId,
       name,
@@ -50,6 +52,7 @@ class Lead {
         .from('leads')
         .insert([
           {
+            tenant_id: tenantId || DEFAULT_TENANT_ID,
             conversation_id: conversationId,
             name,
             email,
@@ -102,17 +105,24 @@ class Lead {
   }
 
   /**
-   * Check if email already exists
+   * Check if email already exists for a tenant
    * @param {string} email - Email address
+   * @param {string} tenantId - Tenant ID (optional)
    * @returns {boolean} True if email exists
    */
-  static async emailExists(email) {
+  static async emailExists(email, tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('leads')
         .select('id')
-        .eq('email', email.toLowerCase())
-        .limit(1);
+        .eq('email', email.toLowerCase());
+
+      // If tenantId provided, scope to tenant
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.limit(1);
 
       if (error) throw error;
       return data && data.length > 0;
@@ -146,16 +156,24 @@ class Lead {
   }
 
   /**
-   * Get all leads (with pagination)
+   * Get all leads (with pagination), optionally filtered by tenant
    * @param {number} limit - Number of leads to return
    * @param {number} offset - Offset for pagination
+   * @param {string} tenantId - Tenant ID (optional, if null returns all)
    * @returns {Array} Array of leads
    */
-  static async getAll(limit = 50, offset = 0) {
+  static async getAll(limit = 50, offset = 0, tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('leads')
-        .select('*')
+        .select('*');
+
+      // If tenantId provided, scope to tenant
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1);
 

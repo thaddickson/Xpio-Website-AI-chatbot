@@ -1,10 +1,16 @@
 /**
- * Xpio Health Lead Generation Chatbot Widget
- * Embeddable chat widget for WordPress sites
+ * Multi-Tenant Lead Generation Chatbot Widget
+ * Embeddable chat widget for any website
  *
- * Usage:
+ * Usage (Single Tenant - Backwards Compatible):
  * <script src="https://your-api-domain.com/chat-widget.js"></script>
  * <script>XpioChatbot.init({ apiUrl: 'https://your-api-domain.com' });</script>
+ *
+ * Usage (Multi-Tenant with API Key):
+ * <script src="https://chat.yourplatform.com/chat-widget.js"></script>
+ * <script>XpioChatbot.init({ apiKey: 'pk_live_yourcompany_xxxx' });</script>
+ *
+ * All branding/settings loaded automatically from tenant configuration
  */
 
 (function() {
@@ -12,16 +18,26 @@
 
   const XpioChatbot = {
     config: {
+      // Multi-tenant: API key identifies the tenant
+      apiKey: null,
+
+      // Can be auto-detected or overridden
       apiUrl: '',
-      primaryColor: '#FC922B', // Orange brand color for button and accents
+
+      // Branding (loaded from tenant settings if apiKey provided)
+      primaryColor: '#FC922B',
       secondaryColor: '#1a1a1a',
-      accentColor: '#BF5409', // Darker orange for hover states
-      userBubbleColor: '#0066FF', // Blue for user messages
-      aiBubbleColor: '#0066FF', // Blue for AI messages
-      humanBubbleColor: '#10b981', // Green for human/Slack messages
-      position: 'bottom-right', // bottom-right, bottom-left
-      greeting: "Hi! Welcome to Xpio Health. How can we help you today?",
-      placeholder: "Type your message..."
+      accentColor: '#BF5409',
+      userBubbleColor: '#0066FF',
+      aiBubbleColor: '#2B2B2B',
+      humanBubbleColor: '#10b981',
+      position: 'bottom-right',
+      greeting: "Hi! How can we help you today?",
+      placeholder: "Type your message...",
+      chatTitle: "Chat with us",
+      logoUrl: null,
+      showWatermark: true,
+      calendlyUrl: null
     },
 
     state: {
@@ -32,17 +48,21 @@
       currentStreamingMessage: '',
       isHandedOff: false,
       pollingInterval: null,
-      hasShownProactiveGreeting: false
+      hasShownProactiveGreeting: false,
+      tenantLoaded: false
     },
 
     /**
      * Initialize the chatbot
      */
-    init(options = {}) {
+    async init(options = {}) {
       this.config = { ...this.config, ...options };
 
-      if (!this.config.apiUrl) {
-        console.error('XpioChatbot: apiUrl is required');
+      // If API key provided, load tenant settings
+      if (this.config.apiKey) {
+        await this.loadTenantSettings();
+      } else if (!this.config.apiUrl) {
+        console.error('XpioChatbot: apiUrl or apiKey is required');
         return;
       }
 
@@ -58,7 +78,59 @@
       // Show proactive greeting after delay
       this.showProactiveGreeting();
 
-      console.log('✅ Xpio Health Chatbot initialized');
+      console.log('✅ Chatbot initialized', this.config.apiKey ? `(Tenant: ${this.config.apiKey.split('_')[2]})` : '');
+    },
+
+    /**
+     * Load tenant settings from API key
+     */
+    async loadTenantSettings() {
+      try {
+        // Extract API URL from script src or use default
+        if (!this.config.apiUrl) {
+          const scripts = document.querySelectorAll('script[src*="chat-widget"]');
+          if (scripts.length > 0) {
+            const scriptUrl = new URL(scripts[scripts.length - 1].src);
+            this.config.apiUrl = scriptUrl.origin;
+          }
+        }
+
+        const response = await fetch(`${this.config.apiUrl}/api/widget/config`, {
+          headers: {
+            'X-API-Key': this.config.apiKey
+          }
+        });
+
+        if (!response.ok) {
+          console.warn('Failed to load tenant settings, using defaults');
+          return;
+        }
+
+        const data = await response.json();
+
+        // Apply tenant branding
+        if (data.branding) {
+          if (data.branding.primaryColor) this.config.primaryColor = data.branding.primaryColor;
+          if (data.branding.chatTitle) this.config.chatTitle = data.branding.chatTitle;
+          if (data.branding.greeting) this.config.greeting = data.branding.greeting;
+          if (data.branding.logoUrl) this.config.logoUrl = data.branding.logoUrl;
+        }
+
+        // Apply tenant features
+        if (data.features) {
+          this.config.showWatermark = !data.features.removeWatermark;
+        }
+
+        // Apply integrations
+        if (data.calendlyUrl) {
+          this.config.calendlyUrl = data.calendlyUrl;
+        }
+
+        this.state.tenantLoaded = true;
+        console.log('✅ Tenant settings loaded');
+      } catch (error) {
+        console.error('Error loading tenant settings:', error);
+      }
     },
 
     /**
@@ -214,7 +286,7 @@
           color: white;
           align-self: flex-start;
           border-bottom-left-radius: 4px;
-          box-shadow: 0 2px 8px rgba(0, 102, 255, 0.2);
+          box-shadow: 0 2px 8px rgba(43, 43, 43, 0.25);
         }
 
         .xpio-message.assistant::before {
@@ -586,7 +658,12 @@
      */
     async fetchGreeting() {
       try {
-        const response = await fetch(`${this.config.apiUrl}/api/chat/greeting`);
+        const headers = {};
+        if (this.config.apiKey) {
+          headers['X-API-Key'] = this.config.apiKey;
+        }
+
+        const response = await fetch(`${this.config.apiUrl}/api/chat/greeting`, { headers });
         const data = await response.json();
         if (data.message) {
           this.config.greeting = data.message;
@@ -752,11 +829,18 @@
       this.state.currentStreamingMessage = '';
 
       try {
+        const headers = {
+          'Content-Type': 'application/json',
+        };
+
+        // Add API key if provided (multi-tenant mode)
+        if (this.config.apiKey) {
+          headers['X-API-Key'] = this.config.apiKey;
+        }
+
         const response = await fetch(`${this.config.apiUrl}/api/chat`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers,
           body: JSON.stringify({
             message,
             conversationId: this.state.conversationId

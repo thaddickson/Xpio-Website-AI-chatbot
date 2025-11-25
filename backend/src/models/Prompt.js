@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_TENANT_ID } from './Tenant.js';
 
 // Lazy initialize Supabase client
 let supabase = null;
@@ -17,19 +18,27 @@ function getSupabase() {
 
 /**
  * Prompt Model - Manages chatbot knowledge base sections
+ * All methods now support multi-tenancy with optional tenantId parameter
  */
 class Prompt {
   /**
-   * Get all active prompt sections in order
+   * Get all active prompt sections in order for a tenant
+   * @param {string} tenantId - Tenant ID (optional, defaults to DEFAULT_TENANT_ID)
    * @returns {Array} Array of prompt sections
    */
-  static async getAllActive() {
+  static async getAllActive(tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('prompt_sections')
         .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+        .eq('is_active', true);
+
+      // Scope to tenant
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('display_order', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -40,15 +49,22 @@ class Prompt {
   }
 
   /**
-   * Get all prompt sections (including inactive)
+   * Get all prompt sections (including inactive) for a tenant
+   * @param {string} tenantId - Tenant ID (optional)
    * @returns {Array} Array of all prompt sections
    */
-  static async getAll() {
+  static async getAll(tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('prompt_sections')
-        .select('*')
-        .order('display_order', { ascending: true });
+        .select('*');
+
+      // Scope to tenant
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.order('display_order', { ascending: true });
 
       if (error) throw error;
       return data || [];
@@ -59,17 +75,24 @@ class Prompt {
   }
 
   /**
-   * Get a single prompt section by slug
+   * Get a single prompt section by slug for a tenant
    * @param {string} slug - Section slug
+   * @param {string} tenantId - Tenant ID (optional)
    * @returns {Object} Prompt section
    */
-  static async getBySlug(slug) {
+  static async getBySlug(slug, tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('prompt_sections')
         .select('*')
-        .eq('slug', slug)
-        .single();
+        .eq('slug', slug);
+
+      // Scope to tenant
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.single();
 
       if (error) throw error;
       return data;
@@ -82,13 +105,17 @@ class Prompt {
   /**
    * Create a new prompt section
    * @param {Object} sectionData - Section data
+   * @param {string} tenantId - Tenant ID (optional, defaults to DEFAULT_TENANT_ID)
    * @returns {Object} Created section
    */
-  static async create(sectionData) {
+  static async create(sectionData, tenantId = null) {
     try {
       const { data, error } = await getSupabase()
         .from('prompt_sections')
-        .insert([sectionData])
+        .insert([{
+          ...sectionData,
+          tenant_id: tenantId || DEFAULT_TENANT_ID
+        }])
         .select()
         .single();
 
@@ -105,16 +132,22 @@ class Prompt {
    * Update a prompt section
    * @param {string} id - Section ID
    * @param {Object} updates - Fields to update
+   * @param {string} tenantId - Tenant ID (optional, for authorization)
    * @returns {Object} Updated section
    */
-  static async update(id, updates) {
+  static async update(id, updates, tenantId = null) {
     try {
-      const { data, error } = await getSupabase()
+      let query = getSupabase()
         .from('prompt_sections')
         .update(updates)
-        .eq('id', id)
-        .select()
-        .single();
+        .eq('id', id);
+
+      // Scope to tenant for authorization
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { data, error } = await query.select().single();
 
       if (error) throw error;
       console.log(`✓ Updated prompt section: ${id}`);
@@ -128,14 +161,22 @@ class Prompt {
   /**
    * Delete a prompt section
    * @param {string} id - Section ID
+   * @param {string} tenantId - Tenant ID (optional, for authorization)
    * @returns {boolean} Success status
    */
-  static async delete(id) {
+  static async delete(id, tenantId = null) {
     try {
-      const { error } = await getSupabase()
+      let query = getSupabase()
         .from('prompt_sections')
         .delete()
         .eq('id', id);
+
+      // Scope to tenant for authorization
+      if (tenantId) {
+        query = query.eq('tenant_id', tenantId);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
       console.log(`✓ Deleted prompt section: ${id}`);
@@ -168,16 +209,17 @@ class Prompt {
   }
 
   /**
-   * Build complete system prompt from active sections
+   * Build complete system prompt from active sections for a tenant
+   * @param {string} tenantId - Tenant ID (optional)
    * @returns {string} Complete system prompt
    */
-  static async buildSystemPrompt() {
+  static async buildSystemPrompt(tenantId = null) {
     try {
-      const sections = await this.getAllActive();
+      const sections = await this.getAllActive(tenantId);
 
       if (sections.length === 0) {
         console.warn('⚠️  No active prompt sections found, using fallback');
-        return 'You are a helpful assistant for Xpio Health.';
+        return 'You are a helpful assistant.';
       }
 
       // Combine all active sections in order
@@ -194,18 +236,19 @@ class Prompt {
   }
 
   /**
-   * Build system prompt with A/B test variations
+   * Build system prompt with A/B test variations for a tenant
    * @param {string} conversationId - Conversation ID for tracking
+   * @param {string} tenantId - Tenant ID (optional)
    * @returns {Object} { prompt: string, variationAssignments: Object }
    */
-  static async buildSystemPromptWithVariations(conversationId) {
+  static async buildSystemPromptWithVariations(conversationId, tenantId = null) {
     try {
-      const sections = await this.getAllActive();
+      const sections = await this.getAllActive(tenantId);
 
       if (sections.length === 0) {
         console.warn('⚠️  No active prompt sections found, using fallback');
         return {
-          prompt: 'You are a helpful assistant for Xpio Health.',
+          prompt: 'You are a helpful assistant.',
           variationAssignments: {}
         };
       }
@@ -218,7 +261,7 @@ class Prompt {
 
       // For each section, check if there are active variations
       for (const section of sections) {
-        const selectedVariation = await PromptVariation.selectVariationForConversation(section.id);
+        const selectedVariation = await PromptVariation.selectVariationForConversation(section.id, tenantId);
 
         if (selectedVariation) {
           // Use variation content
@@ -226,7 +269,7 @@ class Prompt {
           variationAssignments[section.id] = selectedVariation.id;
 
           // Record the assignment
-          await PromptVariation.recordAssignment(conversationId, section.id, selectedVariation.id);
+          await PromptVariation.recordAssignment(conversationId, section.id, selectedVariation.id, tenantId);
 
           console.log(`🧪 Using variation "${selectedVariation.variation_name}" for section "${section.name}"`);
         } else {
@@ -246,7 +289,7 @@ class Prompt {
       console.error('Error building system prompt with variations:', error);
       // Fallback to regular prompt on error
       return {
-        prompt: await this.buildSystemPrompt(),
+        prompt: await this.buildSystemPrompt(tenantId),
         variationAssignments: {},
         usedVariations: false
       };

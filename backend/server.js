@@ -41,9 +41,28 @@ import {
   pollSlackMessages,
   sendToSlackThread
 } from './src/controllers/slackController.js';
+import {
+  registerTenant,
+  login,
+  refreshToken,
+  getCurrentTenant,
+  updateTenantSettings,
+  listApiKeys,
+  createApiKey,
+  revokeApiKey,
+  listTeamMembers,
+  inviteTeamMember,
+  getIntegrations,
+  updateIntegrations,
+  listAllTenants,
+  getPlans,
+  checkSlugAvailability
+} from './src/controllers/tenantController.js';
 import { initializeDatabase } from './src/models/Lead.js';
 import { testEmailConfiguration } from './src/services/emailService.js';
 import { chatRateLimiter } from './src/middleware/rateLimiter.js';
+import { tenantResolver, requireFeature, checkUsageLimits } from './src/middleware/tenantResolver.js';
+import { jwtAuth, requireRole, requirePlatformAdmin } from './src/middleware/tenantAuth.js';
 
 // Validate required environment variables
 const requiredEnvVars = ['ANTHROPIC_API_KEY', 'SUPABASE_URL', 'SUPABASE_KEY'];
@@ -105,27 +124,84 @@ app.use((req, res, next) => {
   next();
 });
 
+// Apply tenant resolver to all routes (optional tenant - backwards compatible)
+app.use(tenantResolver({ allowDefaultTenant: true }));
+
 // Routes
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
+    tenant: req.tenant?.slug || 'default'
   });
 });
 
+// ==================== PUBLIC ENDPOINTS ====================
+
+// Widget config endpoint (for multi-tenant widget initialization)
+app.get('/api/widget/config', (req, res) => {
+  if (!req.tenant) {
+    return res.status(404).json({ error: 'Tenant not found' });
+  }
+
+  res.json({
+    branding: req.tenant.settings?.branding || {},
+    features: {
+      removeWatermark: req.tenant.settings?.features?.removeWatermark || false
+    },
+    calendlyUrl: null // Would come from tenant_integrations
+  });
+});
+
+// Plans info (public)
+app.get('/api/plans', getPlans);
+
+// Check slug availability (public - for registration)
+app.get('/api/tenants/check-slug/:slug', checkSlugAvailability);
+
+// ==================== CHAT ENDPOINTS (tenant-scoped) ====================
+
 app.get('/api/chat/greeting', handleGetGreeting);
-app.post('/api/chat', chatRateLimiter, handleChatStream);
+app.post('/api/chat', chatRateLimiter, checkUsageLimits(), handleChatStream);
 app.post('/api/chat/end', handleEndConversation);
 
 // Stats endpoint (consider adding authentication in production)
 app.get('/api/stats', handleGetStats);
 
 // Slack integration endpoints
-app.post('/api/slack/events', handleSlackEvents); // Webhook for Slack messages
-app.get('/api/slack/poll/:conversationId', pollSlackMessages); // Poll for new human messages
-app.post('/api/slack/send-to-thread', sendToSlackThread); // Send visitor message to Slack thread
+app.post('/api/slack/events', handleSlackEvents);
+app.get('/api/slack/poll/:conversationId', pollSlackMessages);
+app.post('/api/slack/send-to-thread', sendToSlackThread);
+
+// ==================== TENANT AUTH ENDPOINTS ====================
+
+app.post('/api/tenants/register', registerTenant);
+app.post('/api/tenants/login', login);
+app.post('/api/tenants/refresh', refreshToken);
+
+// ==================== TENANT MANAGEMENT ENDPOINTS (authenticated) ====================
+
+app.get('/api/tenant', jwtAuth(), getCurrentTenant);
+app.put('/api/tenant/settings', jwtAuth(), requireRole('owner', 'admin'), updateTenantSettings);
+
+// API Key management
+app.get('/api/tenant/api-keys', jwtAuth(), listApiKeys);
+app.post('/api/tenant/api-keys', jwtAuth(), requireRole('owner', 'admin'), createApiKey);
+app.delete('/api/tenant/api-keys/:keyId', jwtAuth(), requireRole('owner', 'admin'), revokeApiKey);
+
+// Team management
+app.get('/api/tenant/team', jwtAuth(), listTeamMembers);
+app.post('/api/tenant/team/invite', jwtAuth(), requireRole('owner', 'admin'), inviteTeamMember);
+
+// Integrations
+app.get('/api/tenant/integrations', jwtAuth(), getIntegrations);
+app.put('/api/tenant/integrations', jwtAuth(), requireRole('owner', 'admin'), updateIntegrations);
+
+// ==================== PLATFORM ADMIN ENDPOINTS ====================
+
+app.get('/api/platform/tenants', jwtAuth(), requirePlatformAdmin(), listAllTenants);
 
 // Admin authentication middleware
 // Supports multiple admin passwords separated by commas
