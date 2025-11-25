@@ -5,6 +5,11 @@
  * Faster than the full AI-driven test suite.
  *
  * Usage: node test-chatbot-quick.js
+ *
+ * Environment variables:
+ *   API_BASE_URL - Server URL (default: http://localhost:3000)
+ *   TEST_WIDGET_KEY - Your widget API key (pk_live_...) from Admin > Settings > API Keys
+ *                     If not set, uses default tenant (works for single-tenant setups)
  */
 
 import dotenv from 'dotenv';
@@ -13,7 +18,7 @@ import { v4 as uuidv4 } from 'uuid';
 dotenv.config();
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
-const WIDGET_KEY = process.env.TEST_WIDGET_KEY || 'test-widget-key';
+const WIDGET_KEY = process.env.TEST_WIDGET_KEY; // Optional - if not set, uses default tenant
 
 // Quick test cases
 const TEST_CASES = [
@@ -61,12 +66,18 @@ const TEST_CASES = [
  * Send a message and get response
  */
 async function sendMessage(conversationId, message) {
+  const headers = {
+    'Content-Type': 'application/json'
+  };
+
+  // Only add API key header if provided
+  if (WIDGET_KEY) {
+    headers['x-api-key'] = WIDGET_KEY;
+  }
+
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-widget-key': WIDGET_KEY
-    },
+    headers,
     body: JSON.stringify({ message, conversationId })
   });
 
@@ -134,7 +145,7 @@ async function runQuickTests() {
   console.log('\n⚡ Quick Chatbot Validation');
   console.log('===========================\n');
   console.log(`API: ${API_BASE}`);
-  console.log(`Widget Key: ${WIDGET_KEY}\n`);
+  console.log(`Widget Key: ${WIDGET_KEY ? WIDGET_KEY.substring(0, 15) + '...' : '(none - using default tenant)'}\n`);
 
   let passed = 0;
   let failed = 0;

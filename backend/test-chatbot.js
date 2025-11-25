@@ -12,6 +12,12 @@
  *   - handoff: Test handoff to human request
  *   - knowledge: Test product knowledge responses
  *   - all: Run all scenarios (default)
+ *
+ * Environment variables:
+ *   API_BASE_URL - Server URL (default: http://localhost:3000)
+ *   TEST_WIDGET_KEY - Your widget API key (pk_live_...) from Admin > Settings > API Keys
+ *                     If not set, uses default tenant (works for single-tenant setups)
+ *   ANTHROPIC_API_KEY - Required for AI-driven customer simulation
  */
 
 import Anthropic from '@anthropic-ai/sdk';
@@ -21,7 +27,7 @@ import { v4 as uuidv4 } from 'uuid';
 dotenv.config();
 
 const API_BASE = process.env.API_BASE_URL || 'http://localhost:3000';
-const WIDGET_KEY = process.env.TEST_WIDGET_KEY || 'test-widget-key';
+const WIDGET_KEY = process.env.TEST_WIDGET_KEY; // Optional - if not set, uses default tenant
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
@@ -104,12 +110,18 @@ Ask about what services they offer and how they help reduce no-shows.`,
  */
 async function sendMessage(conversationId, message) {
   try {
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    // Only add API key if provided (otherwise uses default tenant)
+    if (WIDGET_KEY) {
+      headers['x-api-key'] = WIDGET_KEY;
+    }
+
     const response = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-widget-key': WIDGET_KEY
-      },
+      headers,
       body: JSON.stringify({
         message,
         conversationId
@@ -310,7 +322,7 @@ async function runAllTests() {
   console.log('\n🚀 Xpio Chatbot Test Suite');
   console.log('==========================\n');
   console.log(`API Base: ${API_BASE}`);
-  console.log(`Widget Key: ${WIDGET_KEY}`);
+  console.log(`Widget Key: ${WIDGET_KEY ? WIDGET_KEY.substring(0, 15) + '...' : '(none - using default tenant)'}`);
 
   const results = [];
   const scenarioKeys = Object.keys(SCENARIOS);
