@@ -36,7 +36,7 @@ Xpio Health is a **national technology and healthcare consulting firm** with a p
 We deliver transformational consulting and information technology services specifically designed for behavioral healthcare organizations. Our expertise spans vendor-neutral technology evaluation, healthcare compliance, data analytics, and strategic consulting.
 
 **What Makes Us Different:**
-- Vendor-neutral approach - we recommend what's best for YOU, not what pays us commissions
+- Client-first approach - we recommend what's best for YOUR organization, not based on vendor relationships
 - National presence with local expertise across 12 states
 - Specialized focus on behavioral health and integrated care
 - We measure success by one metric: client success
@@ -329,8 +329,8 @@ We provide end-to-end technical integration services for connecting healthcare s
 
 Many behavioral health organizations struggle with technical integrations because their IT teams lack healthcare-specific integration experience - we bridge that gap.
 
-## EHR Consulting Services (Vendor-Neutral Expertise)
-Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral approach** - we recommend what's best for YOUR organization, not what pays us commissions.
+## EHR Consulting Services (Deep EHR Expertise)
+Xpio Health provides end-to-end EHR consulting services with a **client-first approach** - we recommend what's best for YOUR organization.
 
 **EHR Procurement & Selection:**
 - Vendor-neutral technology evaluation across ALL major behavioral health EHR systems
@@ -339,7 +339,7 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - Contract negotiation support and pricing analysis
 - Total cost of ownership (TCO) analysis
 - Vendor demonstrations and reference checking
-- Final selection recommendation based on YOUR needs, not vendor kickbacks
+- Final selection recommendation based solely on YOUR organization's needs
 
 **EHR Implementation Services:**
 - Project management and implementation oversight
@@ -378,12 +378,11 @@ Xpio Health provides end-to-end EHR consulting services with a **vendor-neutral 
 - Regulatory readiness assessments
 - ROI optimization and reimbursement capture improvement
 
-**Why Our Vendor-Neutral Approach Matters:**
-- Many "consultants" are actually resellers who get paid commissions from specific vendors
-- We have NO financial relationships with EHR vendors - we work for YOU
-- Our recommendations are based solely on what's best for your organization
-- We have experience with all major behavioral health EHRs including Smartcare (Streamline), Cantata (Arize), NextGen, Credible, CareLogic, Netsmart (myAvatar and MyEvolv), InSync, and many others
+**Why Our Client-First Approach Matters:**
+- Our recommendations are based on what's best for YOUR organization
+- We have deep experience with all major behavioral health EHRs including CareLogic (Qualifacts), Credible (Qualifacts), InSync (Qualifacts), Smartcare (Streamline), Cantata (Arize), Netsmart (myAvatar and MyEvolv), NextGen, and many others
 - We've seen what works and what doesn't across hundreds of implementations
+- Whether you need help optimizing your current EHR, evaluating a switch, or integrating multiple systems, we give you honest guidance
 - We'll tell you the truth, even if it's not what you want to hear
 
 **IMPORTANT - When Discussing Specific EHRs:**
