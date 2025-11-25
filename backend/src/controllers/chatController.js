@@ -209,7 +209,7 @@ export async function handleChatStream(req, res) {
 
       // Create streaming request to Claude
       const stream = await getAnthropic().messages.stream({
-        model: 'claude-opus-4-20250514',
+        model: 'claude-opus-4-5-20251101', // Claude Opus 4.5 - latest
         max_tokens: 4096,
         system: systemPrompt,
         tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL],
@@ -285,32 +285,102 @@ export async function handleChatStream(req, res) {
             }]
           });
 
-          // Get Claude's follow-up message (non-streaming for simplicity)
+          // Get Claude's follow-up message WITH TOOLS so it can call check_calendar_availability
           const followUpResponse = await getAnthropic().messages.create({
-            model: 'claude-opus-4-20250514',
+            model: 'claude-opus-4-5-20251101',
             max_tokens: 2048,
             system: systemPrompt,
+            tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL, CALENDLY_TOOL], // CRITICAL: Include tools!
             messages: conversationData.messages,
           });
 
-          const followUpText = followUpResponse.content
-            .filter(block => block.type === 'text')
-            .map(block => block.text)
-            .join('');
+          // Check if Claude wants to use a tool (likely check_calendar_availability)
+          let followUpToolUse = null;
+          let followUpText = '';
+          for (const block of followUpResponse.content) {
+            if (block.type === 'text') {
+              followUpText += block.text;
+            } else if (block.type === 'tool_use') {
+              followUpToolUse = block;
+            }
+          }
 
+          // If there's text, stream it
+          if (followUpText) {
+            res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
+            fullResponse += '\n\n' + followUpText;
+          }
+
+          // Add assistant's response to history
           const followUpMessage = {
             role: 'assistant',
-            content: followUpText
+            content: followUpResponse.content
           };
           conversationData.messages.push(followUpMessage);
 
           // Log follow-up message to database (don't wait)
-          Conversation.addMessage(conversationId, followUpMessage)
+          Conversation.addMessage(conversationId, { role: 'assistant', content: followUpText })
             .catch(err => console.error('Failed to log follow-up message:', err));
 
-          // Stream the follow-up message
-          res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + followUpText })}\n\n`);
-          fullResponse += '\n\n' + followUpText;
+          // If Claude wants to check calendar after saving lead, handle it!
+          if (followUpToolUse && followUpToolUse.name === 'check_calendar_availability') {
+            console.log(`📅 Claude wants to check calendar after save_lead - handling...`);
+
+            conversationData.calendarChecked = true;
+
+            // Get available times from Calendly
+            const { getAvailableTimes } = await import('../services/calendlyService.js');
+            let availabilityResult;
+            try {
+              availabilityResult = await getAvailableTimes();
+              console.log('📅 Calendly availability:', availabilityResult);
+            } catch (error) {
+              console.error('Failed to check Calendly availability:', error);
+              availabilityResult = {
+                available: false,
+                error: error.message,
+                message: "I'm having trouble checking the calendar right now.",
+                bookingLink: process.env.CALENDLY_EVENT_LINK
+              };
+            }
+
+            // Send tool result back to Claude
+            conversationData.messages.push({
+              role: 'user',
+              content: [{
+                type: 'tool_result',
+                tool_use_id: followUpToolUse.id,
+                content: JSON.stringify(availabilityResult)
+              }]
+            });
+
+            // Get Claude's final response with the calendar times
+            const calendarResponse = await getAnthropic().messages.create({
+              model: 'claude-opus-4-5-20251101',
+              max_tokens: 2048,
+              system: systemPrompt,
+              messages: conversationData.messages,
+            });
+
+            let calendarText = '';
+            for (const block of calendarResponse.content) {
+              if (block.type === 'text') {
+                calendarText += block.text;
+              }
+            }
+
+            // Add to history and stream
+            conversationData.messages.push({
+              role: 'assistant',
+              content: calendarText
+            });
+
+            Conversation.addMessage(conversationId, { role: 'assistant', content: calendarText })
+              .catch(err => console.error('Failed to log calendar message:', err));
+
+            res.write(`data: ${JSON.stringify({ type: 'text', content: '\n\n' + calendarText })}\n\n`);
+            fullResponse += '\n\n' + calendarText;
+          }
         } else if (toolUseDetected && toolUseDetected.name === 'check_calendar_availability') {
           console.log(`📅 Checking Calendly availability...`);
 
@@ -438,7 +508,7 @@ export async function handleChatStream(req, res) {
 
           // Get Claude's follow-up message
           const followUpResponse = await getAnthropic().messages.create({
-            model: 'claude-opus-4-20250514',
+            model: 'claude-opus-4-5-20251101', // Claude Opus 4.5
             max_tokens: 2048,
             system: systemPrompt,
             messages: conversationData.messages,
