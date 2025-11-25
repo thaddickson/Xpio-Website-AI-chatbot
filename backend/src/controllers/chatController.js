@@ -23,6 +23,47 @@ function getAnthropic() {
   return anthropic;
 }
 
+// Model fallback chain (Anthropic only)
+const MODEL_CHAIN = [
+  'claude-opus-4-5-20250514',    // Opus 4.5 - primary
+  'claude-sonnet-4-5-20250514',  // Sonnet 4.5 - fallback 1
+  'claude-3-5-haiku-20241022'    // Haiku 3.5 - fallback 2
+];
+
+/**
+ * Check if error is a retryable overload error
+ */
+function isOverloadedError(error) {
+  return error?.error?.type === 'overloaded_error' ||
+         error?.message?.includes('Overloaded') ||
+         error?.message?.includes('overloaded') ||
+         error?.status === 529;
+}
+
+/**
+ * Try to create a stream with fallback models on overload
+ */
+async function createStreamWithFallback(options) {
+  for (let i = 0; i < MODEL_CHAIN.length; i++) {
+    const model = MODEL_CHAIN[i];
+    try {
+      console.log(`🤖 Trying model: ${model}`);
+      const stream = await getAnthropic().messages.stream({
+        ...options,
+        model: model
+      });
+      console.log(`✅ Using model: ${model}`);
+      return { stream, model };
+    } catch (error) {
+      if (isOverloadedError(error) && i < MODEL_CHAIN.length - 1) {
+        console.warn(`⚠️ ${model} overloaded, trying next model...`);
+        continue;
+      }
+      throw error;
+    }
+  }
+}
+
 // In-memory conversation storage (use Redis for production)
 const conversations = new Map();
 
@@ -299,9 +340,8 @@ export async function handleChatStream(req, res) {
         systemPrompt = conversationData.systemPrompt;
       }
 
-      // Create streaming request to Claude
-      const stream = await getAnthropic().messages.stream({
-        model: 'claude-opus-4-5-20251101', // Claude Opus 4.5 - latest
+      // Create streaming request with model fallback on overload
+      const { stream, model: usedModel } = await createStreamWithFallback({
         max_tokens: 4096,
         system: systemPrompt,
         tools: [LEAD_CAPTURE_TOOL, HANDOFF_TOOL],
@@ -331,7 +371,7 @@ export async function handleChatStream(req, res) {
         // Track API usage for this request
         const tenantId = req.tenantId || DEFAULT_TENANT_ID;
         if (message.usage) {
-          trackUsage(tenantId, conversationId, 'claude-opus-4-5-20251101', message.usage)
+          trackUsage(tenantId, conversationId, usedModel, message.usage)
             .catch(err => console.error('Failed to track usage:', err));
         }
 
