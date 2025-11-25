@@ -1,5 +1,5 @@
 import Lead from '../models/Lead.js';
-import { sendLeadNotification } from './emailService.js';
+import { sendLeadNotification, sendVisitorConfirmation } from './emailService.js';
 import { sendLeadToSlack } from './slackService.js';
 
 /**
@@ -43,6 +43,12 @@ export async function saveLead(leadData, conversationId, conversationHistory) {
     // Send Slack notification (don't wait for it)
     sendLeadToSlack(lead).catch(err => {
       console.error('Failed to send Slack notification:', err);
+    });
+
+    // Send confirmation email to the visitor (don't wait for it)
+    const calendlyLink = process.env.CALENDLY_EVENT_LINK || 'https://calendly.com/thad-xpiohealth/30min';
+    sendVisitorConfirmation(lead, calendlyLink).catch(err => {
+      console.error('Failed to send visitor confirmation email:', err);
     });
 
     // Optional: Send to CRM (implement if needed)

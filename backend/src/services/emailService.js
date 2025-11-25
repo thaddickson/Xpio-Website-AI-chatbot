@@ -209,6 +209,130 @@ function escapeHtml(text) {
 }
 
 /**
+ * Send confirmation email to the visitor after their info is captured
+ * @param {Object} lead - Lead data from database
+ * @param {string} calendlyLink - Optional calendly link if they requested scheduling
+ */
+export async function sendVisitorConfirmation(lead, calendlyLink = null) {
+  // Initialize SendGrid
+  if (!initSendGrid()) {
+    console.log('ℹ️  Visitor confirmation skipped (SendGrid not configured)');
+    return {
+      success: false,
+      skipped: true,
+      reason: 'SendGrid not configured'
+    };
+  }
+
+  try {
+    const firstName = lead.name ? lead.name.split(' ')[0] : 'there';
+
+    const emailBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: linear-gradient(135deg, #FC922B 0%, #BF5409 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+    .header h1 { margin: 0; font-size: 28px; }
+    .header p { margin: 10px 0 0 0; opacity: 0.9; }
+    .content { background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; }
+    .section { margin: 20px 0; }
+    .cta-button { display: inline-block; background: #FC922B; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 15px 0; font-weight: bold; }
+    .cta-button:hover { background: #BF5409; }
+    .info-box { background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #FC922B; }
+    .footer { text-align: center; padding: 20px; color: #95a5a6; font-size: 12px; background: #f8f9fa; border-radius: 0 0 8px 8px; }
+    .contact-info { margin-top: 20px; }
+    .contact-info p { margin: 5px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Thanks for Reaching Out!</h1>
+      <p>Xpio Health - Behavioral Health Technology Experts</p>
+    </div>
+
+    <div class="content">
+      <p>Hi ${firstName},</p>
+
+      <p>Thank you for connecting with Xpio Health! We've received your information and a member of our team will be in touch shortly.</p>
+
+      ${lead.primary_interest ? `
+      <div class="info-box">
+        <strong>What you're interested in:</strong><br>
+        ${lead.primary_interest}
+      </div>
+      ` : ''}
+
+      ${calendlyLink ? `
+      <div class="section" style="text-align: center;">
+        <p><strong>Ready to schedule your meeting?</strong></p>
+        <a href="${calendlyLink}" class="cta-button">📅 Schedule Meeting with Thad</a>
+      </div>
+      ` : ''}
+
+      <div class="section">
+        <h3>What to Expect Next:</h3>
+        <ul>
+          <li>A member of our team will review your needs</li>
+          <li>We'll reach out within 1 business day (often much sooner!)</li>
+          <li>We'll come prepared with insights specific to your situation</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <h3>In the Meantime:</h3>
+        <p>Feel free to explore our solutions:</p>
+        <ul>
+          <li><a href="https://xpiohealth.com/analytics">Xpio Analytics Platform</a> - AI-powered insights for behavioral health</li>
+          <li><a href="https://xpiohealth.com/cybersecurity">HIPAA Compliance & Security</a> - Stay protected and compliant</li>
+          <li><a href="https://xpiohealth.com/ehr-consulting">EHR Consulting</a> - Vendor-neutral guidance</li>
+        </ul>
+      </div>
+
+      <div class="contact-info">
+        <h3>Questions? Reach Us Directly:</h3>
+        <p>📧 Email: <a href="mailto:inquiry@xpiohealth.com">inquiry@xpiohealth.com</a></p>
+        <p>📞 Phone: (888) 974-6408</p>
+        <p>🌐 Website: <a href="https://xpiohealth.com">xpiohealth.com</a></p>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Xpio Health | Improving the health of organizations and the people they serve</p>
+      <p>3118 Judson Street, PO Box 498, Gig Harbor, WA 98335</p>
+    </div>
+  </div>
+</body>
+</html>
+    `;
+
+    const msg = {
+      to: lead.email,
+      from: {
+        email: process.env.EMAIL_FROM || 'thad@xpiohealth.com',
+        name: process.env.EMAIL_FROM_NAME || 'Xpio Health'
+      },
+      replyTo: {
+        email: process.env.NOTIFICATION_EMAIL || 'inquiry@xpiohealth.com',
+        name: 'Xpio Health Team'
+      },
+      subject: `Thanks for Connecting with Xpio Health, ${firstName}!`,
+      html: emailBody,
+    };
+
+    const result = await sgMail.send(msg);
+    console.log(`✅ Visitor confirmation email sent to: ${lead.email}`);
+    return { success: true, messageId: result[0].headers['x-message-id'] };
+  } catch (error) {
+    console.error('❌ Failed to send visitor confirmation email:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Test email configuration
  * @returns {boolean} True if email is configured correctly
  */
@@ -228,4 +352,4 @@ export async function testEmailConfiguration() {
   }
 }
 
-export default { sendLeadNotification, testEmailConfiguration };
+export default { sendLeadNotification, sendVisitorConfirmation, testEmailConfiguration };
