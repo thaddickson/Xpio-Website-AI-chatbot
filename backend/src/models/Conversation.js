@@ -267,6 +267,103 @@ class Conversation {
   }
 
   /**
+   * Get recent conversations for review with filtering
+   * @param {Object} options - Filter options
+   * @returns {Array} Array of conversations
+   */
+  static async getForReview(options = {}) {
+    const { limit = 50, flaggedOnly = false, hasLeadOnly = false, search = '' } = options;
+
+    try {
+      let query = getSupabase()
+        .from('conversations')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (flaggedOnly) {
+        query = query.eq('flagged', true);
+      }
+
+      if (hasLeadOnly) {
+        query = query.eq('lead_captured', true);
+      }
+
+      query = query.limit(limit);
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // If search term provided, filter in memory (for message content search)
+      let results = data || [];
+      if (search) {
+        const searchLower = search.toLowerCase();
+        results = results.filter(c => {
+          const messages = c.messages || [];
+          return messages.some(m =>
+            m.content && m.content.toLowerCase().includes(searchLower)
+          );
+        });
+      }
+
+      return results;
+    } catch (error) {
+      console.error('Database error fetching conversations for review:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Flag a conversation for review
+   * @param {string} conversationId - Unique conversation identifier
+   * @param {boolean} flagged - Flag status
+   * @param {string} flagReason - Reason for flagging
+   * @returns {boolean} Success status
+   */
+  static async setFlag(conversationId, flagged, flagReason = '') {
+    try {
+      const { error } = await getSupabase()
+        .from('conversations')
+        .update({
+          flagged: flagged,
+          flag_reason: flagReason,
+          flagged_at: flagged ? new Date().toISOString() : null
+        })
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Database error flagging conversation:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Add review notes to a conversation
+   * @param {string} conversationId - Unique conversation identifier
+   * @param {string} notes - Review notes
+   * @returns {boolean} Success status
+   */
+  static async addReviewNotes(conversationId, notes) {
+    try {
+      const { error } = await getSupabase()
+        .from('conversations')
+        .update({
+          review_notes: notes,
+          reviewed_at: new Date().toISOString()
+        })
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Database error adding review notes:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get conversation statistics
    * @returns {Object} Stats about conversations
    */

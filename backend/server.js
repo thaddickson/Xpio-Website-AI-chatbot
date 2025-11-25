@@ -47,6 +47,13 @@ import {
   getAnthropicUsage
 } from './src/controllers/usageController.js';
 import {
+  getConversations,
+  getConversation,
+  flagConversation,
+  addNotes,
+  getConversationStats
+} from './src/controllers/conversationController.js';
+import {
   registerTenant,
   login,
   refreshToken,
@@ -275,6 +282,13 @@ app.get('/api/platform/usage', adminAuth, getPlatformUsage);
 
 // Platform admin tenant management
 app.put('/api/platform/tenants/:id', adminAuth, updateTenant);
+
+// Conversation review endpoints (protected)
+app.get('/api/admin/conversations/stats', adminAuth, getConversationStats);
+app.get('/api/admin/conversations/:id', adminAuth, getConversation);
+app.get('/api/admin/conversations', adminAuth, getConversations);
+app.post('/api/admin/conversations/:id/flag', adminAuth, flagConversation);
+app.post('/api/admin/conversations/:id/notes', adminAuth, addNotes);
 
 // 404 handler
 app.use((req, res) => {

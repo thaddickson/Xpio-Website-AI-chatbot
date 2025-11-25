@@ -366,6 +366,7 @@
       <button class="tab" onclick="switchTab('testing')">🧪 A/B Testing</button>
       <button class="tab" onclick="switchTab('tenants')">🏢 Tenants</button>
       <button class="tab" onclick="switchTab('usage')">💰 API Usage</button>
+      <button class="tab" onclick="switchTab('reviews')">💬 Reviews</button>
       <button class="tab" onclick="switchTab('docs')">📖 Docs</button>
     </div>
 
@@ -484,6 +485,46 @@
             </tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Conversation Reviews Tab -->
+    <div id="reviews-tab" class="tab-content">
+      <div class="actions">
+        <button onclick="loadConversations()">🔄 Refresh</button>
+        <label style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+          <input type="checkbox" id="flaggedOnlyFilter" onchange="loadConversations()"> Flagged Only
+        </label>
+        <label style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+          <input type="checkbox" id="leadsOnlyFilter" onchange="loadConversations()"> With Leads Only
+        </label>
+        <input type="text" id="conversationSearch" placeholder="Search messages..." style="margin-left: 15px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 5px; width: 200px;" onkeyup="if(event.key==='Enter') loadConversations()">
+        <button onclick="loadConversations()" class="secondary" style="margin-left: 5px;">Search</button>
+      </div>
+
+      <!-- Review Stats -->
+      <div class="stats-grid" id="reviewStatsGrid" style="margin-bottom: 20px;">
+        <div class="stat-card">
+          <div class="stat-value" id="totalConvos">-</div>
+          <div class="stat-label">Total Conversations</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="flaggedConvos">-</div>
+          <div class="stat-label">Flagged for Review</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="convosWithLeads">-</div>
+          <div class="stat-label">Captured Leads</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avgMsgCount">-</div>
+          <div class="stat-label">Avg Messages/Conv</div>
+        </div>
+      </div>
+
+      <!-- Conversations List -->
+      <div id="conversationsContainer" class="loading">
+        Loading conversations...
       </div>
     </div>
 
@@ -742,6 +783,17 @@
     </div>
   </div>
 
+  <!-- Conversation Detail Modal -->
+  <div id="conversationModal" class="modal">
+    <div class="modal-content" style="max-width: 900px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Conversation Review</h2>
+        <button class="close-btn" onclick="closeConversationModal()">×</button>
+      </div>
+      <div id="conversationModalContent">Loading...</div>
+    </div>
+  </div>
+
   <script>
     const API_URL = window.location.origin;
     let prompts = [];
@@ -893,6 +945,8 @@
         loadTenants();
       } else if (tabName === 'usage') {
         loadBilling();
+      } else if (tabName === 'reviews') {
+        loadConversations();
       }
     }
 
@@ -1557,7 +1611,43 @@
       document.getElementById('aiEditorModal').classList.add('active');
       document.getElementById('aiResults').style.display = 'none';
       document.getElementById('aiFeedback').value = '';
+
+      // Check if we have context from a flagged conversation
+      const savedContext = localStorage.getItem('promptImprovementContext');
+      const contextIndicator = document.getElementById('contextIndicator');
+      if (savedContext) {
+        try {
+          const context = JSON.parse(savedContext);
+          // Show context indicator if it exists, otherwise create it
+          if (!contextIndicator) {
+            const feedbackGroup = document.querySelector('#aiFeedback').parentElement;
+            const indicator = document.createElement('div');
+            indicator.id = 'contextIndicator';
+            indicator.style.cssText = 'background: #e8f5e9; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #4CAF50;';
+            indicator.innerHTML = `<strong>Context loaded from flagged conversation</strong><br>
+              <small>Reason: ${escapeHtml(context.flagReason || 'Not specified')}</small><br>
+              ${context.reviewNotes ? `<small>Notes: ${escapeHtml(context.reviewNotes)}</small>` : ''}
+              <button onclick="clearConversationContext()" style="margin-top: 8px; padding: 4px 8px; font-size: 11px;">Clear Context</button>`;
+            feedbackGroup.insertBefore(indicator, feedbackGroup.firstChild);
+          }
+          document.getElementById('aiFeedback').placeholder = 'Describe what to improve (conversation context will be included automatically)...';
+        } catch (e) {
+          console.error('Failed to parse context:', e);
+        }
+      } else if (contextIndicator) {
+        contextIndicator.remove();
+        document.getElementById('aiFeedback').placeholder = "e.g., 'Responses are too long', 'Not using the calendar tool enough', 'Too formal, make it casual'";
+      }
+
       document.getElementById('aiFeedback').focus();
+    }
+
+    function clearConversationContext() {
+      localStorage.removeItem('promptImprovementContext');
+      const indicator = document.getElementById('contextIndicator');
+      if (indicator) indicator.remove();
+      document.getElementById('aiFeedback').placeholder = "e.g., 'Responses are too long', 'Not using the calendar tool enough', 'Too formal, make it casual'";
+      showSuccess('Conversation context cleared');
     }
 
     async function openAIEditorForVariation(variationId, promptId) {
@@ -1576,11 +1666,26 @@
 
     async function getAIImprovement() {
       const currentContent = document.getElementById('variationContent').value;
-      const feedback = document.getElementById('aiFeedback').value.trim();
+      let feedback = document.getElementById('aiFeedback').value.trim();
 
       if (!feedback) {
         showError('Please describe what you want to improve.');
         return;
+      }
+
+      // Check if we have context from a flagged conversation
+      const savedContext = localStorage.getItem('promptImprovementContext');
+      let conversationContext = null;
+      if (savedContext) {
+        try {
+          conversationContext = JSON.parse(savedContext);
+          // Enhance feedback with context
+          feedback = `${feedback}\n\n--- CONTEXT FROM FLAGGED CONVERSATION ---\nFlag Reason: ${conversationContext.flagReason || 'Not specified'}\nReview Notes: ${conversationContext.reviewNotes || 'None'}\n\nConversation Preview:\n${conversationContext.conversationPreview}`;
+          // Clear after use
+          localStorage.removeItem('promptImprovementContext');
+        } catch (e) {
+          console.error('Failed to parse conversation context:', e);
+        }
       }
 
       const improveBtn = document.getElementById('improveBtn');
@@ -2058,6 +2163,256 @@
 
     function closeTenantDetailsModal() {
       document.getElementById('tenantDetailsModal').classList.remove('active');
+    }
+
+    // ========== CONVERSATION REVIEW ==========
+
+    let allConversations = [];
+
+    async function loadConversations() {
+      const container = document.getElementById('conversationsContainer');
+      container.innerHTML = '<div class="loading">Loading conversations...</div>';
+
+      const flaggedOnly = document.getElementById('flaggedOnlyFilter').checked;
+      const leadsOnly = document.getElementById('leadsOnlyFilter').checked;
+      const search = document.getElementById('conversationSearch').value.trim();
+
+      try {
+        // Load conversations and stats in parallel
+        const [convosRes, statsRes] = await Promise.all([
+          fetch(`${API_URL}/api/admin/conversations?limit=50&flaggedOnly=${flaggedOnly}&hasLeadOnly=${leadsOnly}&search=${encodeURIComponent(search)}`, {
+            headers: getAuthHeaders(false)
+          }),
+          fetch(`${API_URL}/api/admin/conversations/stats`, {
+            headers: getAuthHeaders(false)
+          })
+        ]);
+
+        if (handleAuthError(convosRes) || handleAuthError(statsRes)) return;
+
+        const convosData = await convosRes.json();
+        const statsData = await statsRes.json();
+
+        allConversations = convosData.conversations || [];
+
+        // Update stats
+        const stats = statsData.stats || {};
+        document.getElementById('totalConvos').textContent = stats.total || 0;
+        document.getElementById('flaggedConvos').textContent = allConversations.filter(c => c.flagged).length || 0;
+        document.getElementById('convosWithLeads').textContent = stats.withLeads || 0;
+        document.getElementById('avgMsgCount').textContent = stats.avgMessages || 0;
+
+        renderConversations(allConversations);
+      } catch (error) {
+        container.innerHTML = `<div class="error">Failed to load conversations: ${error.message}</div>`;
+      }
+    }
+
+    function renderConversations(conversations) {
+      const container = document.getElementById('conversationsContainer');
+
+      if (conversations.length === 0) {
+        container.innerHTML = '<div class="loading">No conversations found matching your filters.</div>';
+        return;
+      }
+
+      container.innerHTML = `
+        <div style="margin-bottom: 15px; padding: 15px; background: #f0f9ff; border-left: 4px solid #0066FF; border-radius: 4px;">
+          <strong>Review conversations to identify prompt improvements:</strong> Flag conversations where the AI response wasn't ideal, add notes about what should be different, then use those insights in the AI Prompt Editor.
+        </div>
+      ` + conversations.map(conv => {
+        const messages = conv.messages || [];
+        const lastMessage = messages[messages.length - 1];
+        const previewText = lastMessage ? lastMessage.content.substring(0, 150) : 'No messages';
+        const statusColor = conv.flagged ? '#f44336' : (conv.lead_captured ? '#4CAF50' : '#999');
+        const statusText = conv.flagged ? 'Flagged' : (conv.lead_captured ? 'Lead Captured' : 'No Lead');
+
+        return `
+          <div class="section-card" style="margin-bottom: 15px; border-left: 4px solid ${statusColor};">
+            <div class="section-header">
+              <div style="flex: 1;">
+                <div class="section-title" style="font-size: 14px;">
+                  ${escapeHtml(conv.conversation_id.substring(0, 20))}...
+                  <span style="display: inline-block; padding: 2px 8px; background: ${statusColor}; color: white; border-radius: 3px; font-size: 11px; margin-left: 8px;">
+                    ${statusText}
+                  </span>
+                  ${conv.is_handed_off ? '<span style="display: inline-block; padding: 2px 8px; background: #FF9800; color: white; border-radius: 3px; font-size: 11px; margin-left: 5px;">Handed Off</span>' : ''}
+                </div>
+                <div class="section-meta">
+                  ${messages.length} messages | ${new Date(conv.created_at).toLocaleString()}
+                  ${conv.flag_reason ? ` | Reason: ${escapeHtml(conv.flag_reason)}` : ''}
+                </div>
+              </div>
+            </div>
+
+            <div style="background: #f9f9f9; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 13px; max-height: 80px; overflow: hidden;">
+              <strong>${lastMessage?.role === 'assistant' ? 'AI:' : 'User:'}</strong> ${escapeHtml(previewText)}${previewText.length >= 150 ? '...' : ''}
+            </div>
+
+            ${conv.review_notes ? `
+              <div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin: 10px 0; font-size: 12px;">
+                <strong>Notes:</strong> ${escapeHtml(conv.review_notes)}
+              </div>
+            ` : ''}
+
+            <div class="section-actions">
+              <button onclick="viewConversation('${conv.conversation_id}')">👁️ View Full</button>
+              <button onclick="toggleFlag('${conv.conversation_id}', ${!conv.flagged})" style="background: ${conv.flagged ? '#4CAF50' : '#f44336'};">
+                ${conv.flagged ? '✓ Unflag' : '🚩 Flag'}
+              </button>
+              <button onclick="addReviewNotes('${conv.conversation_id}')" class="secondary">📝 Add Notes</button>
+              ${conv.flagged ? `<button onclick="useForPromptImprovement('${conv.conversation_id}')" style="background: #9C27B0;">🤖 Improve Prompt</button>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function viewConversation(conversationId) {
+      document.getElementById('conversationModal').classList.add('active');
+      const content = document.getElementById('conversationModalContent');
+      content.innerHTML = '<div class="loading">Loading conversation...</div>';
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/conversations/${conversationId}`, {
+          headers: getAuthHeaders(false)
+        });
+
+        if (handleAuthError(response)) return;
+
+        const data = await response.json();
+        const conv = data.conversation;
+
+        if (!conv) {
+          content.innerHTML = '<div class="error">Conversation not found</div>';
+          return;
+        }
+
+        const messages = conv.messages || [];
+
+        content.innerHTML = `
+          <div style="margin-bottom: 20px;">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
+              <span style="padding: 4px 12px; background: ${conv.flagged ? '#f44336' : '#e0e0e0'}; color: ${conv.flagged ? 'white' : '#333'}; border-radius: 15px; font-size: 12px;">
+                ${conv.flagged ? '🚩 Flagged' : 'Not Flagged'}
+              </span>
+              <span style="padding: 4px 12px; background: ${conv.lead_captured ? '#4CAF50' : '#e0e0e0'}; color: ${conv.lead_captured ? 'white' : '#333'}; border-radius: 15px; font-size: 12px;">
+                ${conv.lead_captured ? '✓ Lead Captured' : 'No Lead'}
+              </span>
+              <span style="padding: 4px 12px; background: #e0e0e0; border-radius: 15px; font-size: 12px;">
+                ${messages.length} messages
+              </span>
+              <span style="padding: 4px 12px; background: #e0e0e0; border-radius: 15px; font-size: 12px;">
+                ${new Date(conv.created_at).toLocaleString()}
+              </span>
+            </div>
+
+            ${conv.flag_reason ? `<div style="background: #ffebee; padding: 10px; border-radius: 5px; margin-bottom: 15px;"><strong>Flag Reason:</strong> ${escapeHtml(conv.flag_reason)}</div>` : ''}
+            ${conv.review_notes ? `<div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-bottom: 15px;"><strong>Review Notes:</strong> ${escapeHtml(conv.review_notes)}</div>` : ''}
+          </div>
+
+          <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 15px; background: #fafafa;">
+            ${messages.map((msg, idx) => `
+              <div style="margin-bottom: 15px; display: flex; ${msg.role === 'assistant' ? 'justify-content: flex-start;' : 'justify-content: flex-end;'}">
+                <div style="max-width: 80%; padding: 12px 15px; border-radius: 12px; ${msg.role === 'assistant' ? 'background: white; border: 1px solid #ddd;' : 'background: #FC922B; color: white;'}">
+                  <div style="font-size: 11px; opacity: 0.7; margin-bottom: 5px;">
+                    ${msg.role === 'assistant' ? '🤖 AI' : '👤 User'} ${msg.timestamp ? '• ' + new Date(msg.timestamp).toLocaleTimeString() : ''}
+                  </div>
+                  <div style="white-space: pre-wrap; font-size: 14px;">${escapeHtml(msg.content)}</div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <button onclick="toggleFlag('${conv.conversation_id}', ${!conv.flagged}); closeConversationModal();" style="background: ${conv.flagged ? '#4CAF50' : '#f44336'};">
+              ${conv.flagged ? '✓ Unflag' : '🚩 Flag for Review'}
+            </button>
+            <button onclick="addReviewNotes('${conv.conversation_id}')" class="secondary">📝 Add Notes</button>
+            ${conv.flagged ? `<button onclick="useForPromptImprovement('${conv.conversation_id}')" style="background: #9C27B0;">🤖 Use for Prompt Improvement</button>` : ''}
+            <button onclick="closeConversationModal()" class="secondary" style="margin-left: auto;">Close</button>
+          </div>
+        `;
+      } catch (error) {
+        content.innerHTML = `<div class="error">Failed to load conversation: ${error.message}</div>`;
+      }
+    }
+
+    async function toggleFlag(conversationId, shouldFlag) {
+      let reason = '';
+      if (shouldFlag) {
+        reason = prompt('Why are you flagging this conversation?\n\nExamples:\n- Response too long\n- Wrong tone\n- Missed lead opportunity\n- Incorrect information\n- Could be more helpful');
+        if (reason === null) return; // Cancelled
+      }
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/conversations/${conversationId}/flag`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ flagged: shouldFlag, reason })
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) throw new Error('Failed to update flag');
+
+        showSuccess(shouldFlag ? 'Conversation flagged for review' : 'Flag removed');
+        loadConversations();
+      } catch (error) {
+        showError('Failed to update flag: ' + error.message);
+      }
+    }
+
+    async function addReviewNotes(conversationId) {
+      const conv = allConversations.find(c => c.conversation_id === conversationId);
+      const existingNotes = conv?.review_notes || '';
+
+      const notes = prompt('Add review notes for this conversation:\n\nWhat should the AI have done differently? What prompt changes would help?', existingNotes);
+      if (notes === null) return; // Cancelled
+
+      try {
+        const response = await fetch(`${API_URL}/api/admin/conversations/${conversationId}/notes`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          body: JSON.stringify({ notes })
+        });
+
+        if (handleAuthError(response)) return;
+
+        if (!response.ok) throw new Error('Failed to save notes');
+
+        showSuccess('Notes saved successfully');
+        loadConversations();
+      } catch (error) {
+        showError('Failed to save notes: ' + error.message);
+      }
+    }
+
+    function useForPromptImprovement(conversationId) {
+      const conv = allConversations.find(c => c.conversation_id === conversationId);
+      if (!conv) return;
+
+      // Build context from the conversation
+      const messages = conv.messages || [];
+      const conversationText = messages.map(m => `${m.role === 'assistant' ? 'AI' : 'User'}: ${m.content}`).join('\n\n');
+
+      // Store for the AI editor
+      localStorage.setItem('promptImprovementContext', JSON.stringify({
+        conversationId,
+        flagReason: conv.flag_reason || '',
+        reviewNotes: conv.review_notes || '',
+        conversationPreview: conversationText.substring(0, 2000)
+      }));
+
+      // Switch to A/B testing tab and show a hint
+      alert('Context saved! Go to the A/B Testing tab, select a prompt section, and click "AI Improve" - the AI will use this conversation to suggest improvements.');
+
+      // Switch to testing tab
+      document.querySelector('.tab[onclick*="testing"]').click();
+    }
+
+    function closeConversationModal() {
+      document.getElementById('conversationModal').classList.remove('active');
     }
   </script>
 
